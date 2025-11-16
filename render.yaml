@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: smart-qr-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: MONGODB_URI
+      - key: JWT_SECRET
+      - key: CLOUDINARY_CLOUD_NAME
+      - key: CLOUDINARY_API_KEY
+      - key: CLOUDINARY_API_SECRET
