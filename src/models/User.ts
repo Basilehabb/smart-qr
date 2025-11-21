@@ -1,13 +1,12 @@
 import { Schema, model, Document } from "mongoose";
 
 export interface UserDocument extends Document {
-  name?: string;
+  name: string;
   email: string;
   phone?: string;
   job?: string;
-  password?: string;
+  passwordHash: string;
   avatar?: string;
-  qrCode?: string;
   isAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -15,13 +14,20 @@ export interface UserDocument extends Document {
 
 const UserSchema = new Schema<UserDocument>(
   {
-    name: String,
+    name: { type: String, required: true },
+    
     email: { type: String, required: true, unique: true },
-    phone: String,
-    job: String,
-    password: String,
-    avatar: String,
-    qrCode: String,
+    
+    phone: { type: String, default: "" },
+    
+    job: { type: String, default: "" },
+    
+    // 🔥 Important: never store raw password
+    passwordHash: { type: String, required: true },
+    
+    avatar: { type: String, default: "" },
+
+    // 🔥 Admin Role
     isAdmin: { type: Boolean, default: false },
   },
   { timestamps: true }

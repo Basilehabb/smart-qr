@@ -3,23 +3,23 @@ import {
   register,
   login,
   createAdminIfNotExists,
-  getMe, // ✅ نضيف الدالة دي
+  getMe
 } from "../controllers/authController";
 
-import { verifyToken } from "../middleware/authMiddleware"; // ✅ لحماية الـ /me
+import { verifyToken } from "../middleware/authMiddleware";
 
 const router = Router();
 
-// ✅ إنشاء حساب جديد
+// Register user
 router.post("/register", register);
 
-// ✅ تسجيل الدخول
+// Login user
 router.post("/login", login);
 
-// ✅ إنشاء الأدمن لو مش موجود (تُستخدم أول مرة فقط)
+// Create admin (only used once during setup)
 router.post("/create-admin-if-not-exists", createAdminIfNotExists);
 
-// ✅ جلب بيانات المستخدم الحالي (محمي بالتوكن)
-router.get("/me", verifyToken, getMe);
+// Get current authenticated user
+router.get("/me", verifyToken as any, getMe as any);
 
 export default router;

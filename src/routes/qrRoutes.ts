@@ -1,9 +1,14 @@
 import { Router } from "express";
 import { createQR, getQRDetails, linkUserToQR } from "../controllers/qrController";
+import { verifyToken } from "../middleware/authMiddleware";
+
 const router = Router();
 
-router.post("/create", createQR);
+// Public
 router.get("/:code", getQRDetails);
-router.post("/link", linkUserToQR);
+
+// Logged-in only
+router.post("/create", verifyToken, createQR);
+router.post("/link", verifyToken, linkUserToQR);
 
 export default router;
