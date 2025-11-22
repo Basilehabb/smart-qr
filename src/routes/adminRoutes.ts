@@ -14,7 +14,7 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 const router = Router();
 
 // all admin routes protected
-router.use(verifyToken, verifyAdmin);
+router.use(verifyToken as any, verifyAdmin as any);
 
 router.get("/overview", getOverview);
 router.get("/users", listUsers);

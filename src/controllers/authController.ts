@@ -127,3 +127,33 @@ export const getMe = async (req: any, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+// update user profile
+export const updateProfile = async (req: any, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const { name, email, phone, job, avatar, password } = req.body;
+
+    const updates: any = {
+      name,
+      email,
+      phone,
+      job,
+      avatar,
+    };
+
+    // Remove undefined fields
+    Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
+
+    if (password) {
+      const hashed = await bcrypt.hash(password, 10);
+      updates.passwordHash = hashed;
+    }
+
+    const updated = await User.findByIdAndUpdate(userId, updates, { new: true }).select("-passwordHash");
+
+    res.json({ message: "Profile updated", user: updated });
+  } catch (err) {
+    console.error("updateProfile error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

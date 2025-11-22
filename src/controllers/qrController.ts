@@ -168,3 +168,23 @@ export const deleteQR = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// ⬇ أضف هذا تحت باقي الـ imports
+import QRCode from "../models/QRCode";
+
+// ===============
+// GET MY QR CODE
+// ===============
+export const getMyQr = async (req: any, res: Response) => {
+  try {
+    const qr = await QRCode.findOne({ user: req.user.id });
+
+    if (!qr) return res.json({ code: null });
+
+    res.json({ code: qr.code });
+  } catch (err) {
+    console.error("getMyQr error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
