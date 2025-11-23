@@ -9,14 +9,16 @@ import { verifyToken } from "../middleware/authMiddleware";
 
 const router = Router();
 
-// Public
-router.get("/:code", getQRDetails);
-
-// Logged-in required
+// ======================
+// Logged-in routes FIRST
+// ======================
+router.get("/my", verifyToken as any, getMyQr as any);
 router.post("/create", verifyToken as any, createQR as any);
 router.post("/link", verifyToken as any, linkUserToQR as any);
 
-// 🔥 Correction: My QR route
-router.get("/my", verifyToken as any, getMyQr as any);
+// ======================
+// Public QR Scan
+// ======================
+router.get("/:code", getQRDetails);
 
 export default router;
