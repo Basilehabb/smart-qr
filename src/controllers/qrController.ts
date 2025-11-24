@@ -177,7 +177,7 @@ import QRCode from "../models/QRCode";
 // ===============
 export const getMyQr = async (req: any, res: Response) => {
   try {
-    const qr = await QRCode.findOne({ user: req.user.id });
+    const qr = await QRCode.findOne({ userId: req.user.id });
 
     if (!qr) return res.json({ code: null });
 
