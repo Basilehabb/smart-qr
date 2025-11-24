@@ -177,14 +177,14 @@ import QRCode from "../models/QRCode";
 // ===============
 export const getMyQr = async (req: any, res: Response) => {
   try {
-    const qr = await QRCode.findOne({ userId: req.user.id });
+    const qrs = await QRCode.find({ userId: req.user.id });
 
-    if (!qr) return res.json({ code: null });
+    return res.json({
+      codes: qrs.map(qr => qr.code)  // → array of codes
+    });
 
-    res.json({ code: qr.code });
   } catch (err) {
     console.error("getMyQr error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
