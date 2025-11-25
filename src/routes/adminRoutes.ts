@@ -8,15 +8,15 @@ import {
   unlinkQR,
   updateUser,
   createUser,
-  scanAnalytics,
-  createQR,
+  scanAnalytics
 } from "../controllers/adminController";
+
+import { createQR } from "../controllers/qrController"; // ← صح
 
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 
 const router = Router();
 
-// all admin routes protected
 router.use(verifyToken as any, verifyAdmin as any);
 
 // OVERVIEW
@@ -30,7 +30,7 @@ router.delete("/users/:userId", deleteUser);
 
 // QRS
 router.get("/qrs", listQRs);
-router.post("/qrs/create", createQR); // ⬅ هنا إضافة Create QR
+router.post("/qrs", createQR);
 router.patch("/qrs/:code/unlink", unlinkQR);
 router.delete("/qrs/:code", deleteQR);
 

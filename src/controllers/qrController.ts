@@ -1,6 +1,42 @@
 import { Request, Response } from "express";
 import QRCodeModel from "../models/QRCode";
 import ScanLog from "../models/ScanLog";
+import { nanoid } from "nanoid";
+
+/**
+ * 0) Create QR (Admin only)
+ */
+export const createQR = async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Only admins can create QR codes" });
+    }
+
+    // allow user to enter custom code OR auto-generate
+    let { code } = req.body;
+
+    if (!code) {
+      code = nanoid(10).toUpperCase();
+    }
+
+    // check duplicate
+    const exists = await QRCodeModel.findOne({ code });
+    if (exists) {
+      return res.status(409).json({ message: "QR already exists" });
+    }
+
+    const qr = await QRCodeModel.create({ code });
+
+    return res.status(201).json({
+      success: true,
+      qr
+    });
+
+  } catch (error) {
+    console.error("createQR error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 
 /**
  * 1) Get QR Details (Scan)
