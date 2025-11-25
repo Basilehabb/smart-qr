@@ -49,6 +49,25 @@ export const listUsers = async (req: Request, res: Response) => {
   }
 };
 
+// ===============================
+// Update USER
+// ===============================
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, phone, job } = req.body;
+
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      { name, email, phone, job },
+      { new: true }
+    ).select("-passwordHash");
+
+    res.json({ user: updated });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 
 // ===============================

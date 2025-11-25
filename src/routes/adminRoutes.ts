@@ -6,6 +6,7 @@ import {
   listQRs,
   deleteQR,
   unlinkQR,
+  updateUser,
   scanAnalytics
 } from "../controllers/adminController";
 
@@ -19,6 +20,7 @@ router.use(verifyToken as any, verifyAdmin as any);
 router.get("/overview", getOverview);
 router.get("/users", listUsers);
 router.delete("/users/:userId", deleteUser);
+router.patch("/users/:userId", updateUser);
 
 router.get("/qrs", listQRs);
 router.delete("/qrs/:code", deleteQR);
