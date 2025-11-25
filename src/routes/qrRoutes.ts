@@ -20,4 +20,5 @@ router.post("/link", verifyToken as any, linkUserToQR as any);
 // ======================
 router.get("/:code", getQRDetails);
 
+
 export default router;

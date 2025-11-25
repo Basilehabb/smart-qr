@@ -11,7 +11,7 @@ import {
   scanAnalytics
 } from "../controllers/adminController";
 
-import { createQR } from "../controllers/qrController"; // ← صح
+import { createQR,createQRForUser,linkExistingQRToUser } from "../controllers/qrController";
 
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 
@@ -27,6 +27,9 @@ router.get("/users", listUsers);
 router.post("/users", createUser);
 router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
+router.post("/users/:userId/qrs", createQRForUser);
+router.patch("/users/:userId/qrs/link", linkExistingQRToUser);
+
 
 // QRS
 router.get("/qrs", listQRs);
