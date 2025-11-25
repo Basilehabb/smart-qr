@@ -10,8 +10,14 @@ import {
   listQRs,
   unlinkQR,
   deleteQR,
-  scanAnalytics
+  scanAnalytics,
 } from "../controllers/adminController";
+
+import {
+  createQR,
+  createQRForUser,
+  linkExistingQRToUser
+} from "../controllers/qrController";
 
 const router = Router();
 
@@ -25,9 +31,15 @@ router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
 
 // QR Dashboard (no linking here)
+router.post("/qrs", createQR); // ← Create QR general
 router.get("/qrs", listQRs);
 router.patch("/qrs/:code/unlink", unlinkQR);
 router.delete("/qrs/:code", deleteQR);
+
+
+// ========== USER QR MANAGEMENT ==========
+router.post("/users/:userId/qrs", createQRForUser); // ← Create QR for user
+router.patch("/users/:userId/qrs/link", linkExistingQRToUser); // ← Link existing QR
 
 // Analytics
 router.get("/scan-analytics", scanAnalytics);
