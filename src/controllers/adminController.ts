@@ -29,12 +29,26 @@ export const getOverview = async (req: Request, res: Response) => {
 // ===============================
 export const listUsers = async (req: Request, res: Response) => {
   try {
+    // نجيب كل اليوزرز
     const users = await User.find().select("-passwordHash");
-    res.json({ users });  // ← مهم جداً
+
+    // نجيب كل ال QR codes
+    const qrs = await QRCode.find();
+
+    // نحسب qrCount لكل يوزر
+    const usersWithQRCount = users.map((u) => ({
+      ...u.toObject(),
+      qrCount: qrs.filter(q => q.userId?.toString() === u._id.toString()).length
+    }));
+
+    res.json({ users: usersWithQRCount });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 // ===============================
