@@ -11,7 +11,11 @@ import {
   scanAnalytics
 } from "../controllers/adminController";
 
-import { createQR,createQRForUser,linkExistingQRToUser } from "../controllers/qrController";
+import { 
+  createQR,
+  createQRForUser,
+  linkExistingQRToUser 
+} from "../controllers/qrController";
 
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 
@@ -27,13 +31,14 @@ router.get("/users", listUsers);
 router.post("/users", createUser);
 router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
-router.post("/users/:userId/qrs", createQRForUser);
-router.patch("/users/:userId/qrs/link", linkExistingQRToUser);
 
+// User-level QR actions
+router.post("/users/:userId/qrs/create", createQRForUser);
+router.patch("/users/:userId/qrs/link", linkExistingQRToUser);
 
 // QRS
 router.get("/qrs", listQRs);
-router.post("/qrs", createQR);
+router.post("/qrs/create", createQR);  // ← لازم يكون Create هنا
 router.patch("/qrs/:code/unlink", unlinkQR);
 router.delete("/qrs/:code", deleteQR);
 
