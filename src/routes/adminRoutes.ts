@@ -1,48 +1,35 @@
 import { Router } from "express";
+import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
+
 import {
   getOverview,
   listUsers,
+  createUser,
+  updateUser,
   deleteUser,
   listQRs,
-  deleteQR,
   unlinkQR,
-  updateUser,
-  createUser,
+  deleteQR,
   scanAnalytics
 } from "../controllers/adminController";
-
-import { 
-  createQR,
-  createQRForUser,
-  linkExistingQRToUser 
-} from "../controllers/qrController";
-
-import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 
 const router = Router();
 
 router.use(verifyToken as any, verifyAdmin as any);
-
-// OVERVIEW
 router.get("/overview", getOverview);
 
-// USERS
+// Users
 router.get("/users", listUsers);
 router.post("/users", createUser);
 router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
 
-// User-level QR actions
-router.post("/users/:userId/qrs/create", createQRForUser);
-router.patch("/users/:userId/qrs/link", linkExistingQRToUser);
-
-// QRS
+// QR Dashboard (no linking here)
 router.get("/qrs", listQRs);
-router.post("/qrs/create", createQR);  // ← لازم يكون Create هنا
 router.patch("/qrs/:code/unlink", unlinkQR);
 router.delete("/qrs/:code", deleteQR);
 
-// SCAN ANALYTICS
+// Analytics
 router.get("/scan-analytics", scanAnalytics);
 
 export default router;

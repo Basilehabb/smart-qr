@@ -4,48 +4,13 @@ import ScanLog from "../models/ScanLog";
 import { nanoid } from "nanoid";
 
 /**
- * 0) Create QR (Admin only)
- */
-export const createQR = async (req: Request, res: Response) => {
-  try {
-    if (!req.user?.isAdmin) {
-      return res.status(403).json({ message: "Only admins can create QR codes" });
-    }
-
-    // allow user to enter custom code OR auto-generate
-    let { code } = req.body;
-
-    if (!code) {
-      code = nanoid(10).toUpperCase();
-    }
-
-    // check duplicate
-    const exists = await QRCodeModel.findOne({ code });
-    if (exists) {
-      return res.status(409).json({ message: "QR already exists" });
-    }
-
-    const qr = await QRCodeModel.create({ code });
-
-    return res.status(201).json({
-      success: true,
-      qr
-    });
-
-  } catch (error) {
-    console.error("createQR error:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * 1) Get QR Details (Scan)
+ * PUBLIC — QR Scan
  */
 export const getQRDetails = async (req: Request, res: Response) => {
   try {
     const { code } = req.params;
 
-    const qr = await QRCodeModel.findOne({ code }).populate("userId", "-password");
+    const qr = await QRCodeModel.findOne({ code }).populate("userId", "-passwordHash");
     if (!qr) return res.status(404).json({ message: "QR not found" });
 
     await ScanLog.create({
@@ -55,20 +20,19 @@ export const getQRDetails = async (req: Request, res: Response) => {
     });
 
     return res.json({
-      code: qr.code,
+      code,
       linked: !!qr.userId,
-      user: qr.userId || null
+      user: qr.userId ?? null,
     });
 
-  } catch (error) {
-    console.error("getQRDetails error:", error);
+  } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
 
 /**
- * 2) Link QR to logged-in user
+ * USER — Link QR to logged-in user
  */
 export const linkUserToQR = async (req: Request, res: Response) => {
   try {
@@ -78,70 +42,87 @@ export const linkUserToQR = async (req: Request, res: Response) => {
     const qr = await QRCodeModel.findOne({ code });
     if (!qr) return res.status(404).json({ message: "QR not found" });
 
-    if (qr.userId)
+    if (qr.userId) {
       return res.status(409).json({ status: "already_linked" });
+    }
 
     qr.userId = req.user.id;
     await qr.save();
 
-    return res.json({ status: "linked", code });
+    res.json({ status: "linked", code });
 
-  } catch (error) {
-    console.error("linkUserToQR error:", error);
+  } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
 
 /**
- * 3) Get My QR Codes
+ * USER — Get all QR codes for logged-in user
  */
 export const getMyQr = async (req: any, res: Response) => {
   try {
     const qrs = await QRCodeModel.find({ userId: req.user.id });
-    return res.json({ codes: qrs.map(qr => qr.code) });
+    res.json({ codes: qrs.map(q => q.code) });
 
   } catch (err) {
-    console.error("getMyQr error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 /**
- * 4) Create QR for a specific user (Admin)
+ * ADMIN — Create general QR code
+ */
+export const createQR = async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.isAdmin)
+      return res.status(403).json({ message: "Only admins can create QR codes" });
+
+    let { code } = req.body;
+    if (!code) code = nanoid(10).toUpperCase();
+
+    const exists = await QRCodeModel.findOne({ code });
+    if (exists) return res.status(409).json({ message: "QR already exists" });
+
+    const qr = await QRCodeModel.create({ code });
+
+    res.status(201).json({ success: true, qr });
+
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+/**
+ * ADMIN — Create new QR and auto-link it to User
  */
 export const createQRForUser = async (req: Request, res: Response) => {
   try {
     if (!req.user?.isAdmin)
-      return res.status(403).json({ message: "Only admins can perform this" });
+      return res.status(403).json({ message: "Admin only" });
 
     const { userId } = req.params;
-
     const code = nanoid(10).toUpperCase();
 
-    const qr = await QRCodeModel.create({
-      code,
-      userId
-    });
+    const qr = await QRCodeModel.create({ code, userId });
 
-    return res.json({
-      message: "QR created and linked to user",
-      qr
-    });
+    res.json({ message: "QR created and linked", qr });
 
-  } catch (error) {
-    console.error("createQRForUser error:", error);
+  } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 /**
- * 5) Link existing QR to a specific user (Admin)
+ * ADMIN — Link existing unassigned QR to User
  */
 export const linkExistingQRToUser = async (req: Request, res: Response) => {
   try {
     if (!req.user?.isAdmin)
-      return res.status(403).json({ message: "Only admins can perform this" });
+      return res.status(403).json({ message: "Admin only" });
 
     const { userId } = req.params;
     const { code } = req.body;
@@ -149,20 +130,14 @@ export const linkExistingQRToUser = async (req: Request, res: Response) => {
     const qr = await QRCodeModel.findOne({ code });
     if (!qr) return res.status(404).json({ message: "QR not found" });
 
-    if (qr.userId)
-      return res.status(409).json({ message: "QR is already linked" });
+    if (qr.userId) return res.status(409).json({ message: "QR already linked" });
 
     qr.userId = userId;
     await qr.save();
 
-    return res.json({
-      message: "QR linked to user",
-      qr
-    });
+    res.json({ message: "QR linked", qr });
 
-  } catch (error) {
-    console.error("linkExistingQRToUser error:", error);
+  } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
-
