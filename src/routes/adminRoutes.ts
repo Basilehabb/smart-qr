@@ -11,7 +11,7 @@ import {
   unlinkQR,
   deleteQR,
   scanAnalytics,
-  resetUserPassword
+  resetPassword
 } from "../controllers/adminController";
 
 import {
@@ -30,7 +30,8 @@ router.get("/users", listUsers);
 router.post("/users", createUser);
 router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
-router.patch("/users/:userId/reset-password", resetUserPassword);
+router.post("/users/:userId/reset-password", resetPassword);
+
 
 
 // QR Dashboard (no linking here)

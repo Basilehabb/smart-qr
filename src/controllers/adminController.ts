@@ -136,7 +136,7 @@ export const scanAnalytics = async (req: Request, res: Response) => {
 /**
  * reset password
  */
-export const resetUserPassword = async (req: Request, res: Response) => {
+export const   resetPassword = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
