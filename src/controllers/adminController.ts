@@ -3,6 +3,8 @@ import User from "../models/User";
 import QRCode from "../models/QRCode";
 import ScanLog from "../models/ScanLog";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+
 
 /**
  * Dashboard Overview
@@ -130,3 +132,29 @@ export const scanAnalytics = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * reset password
+ */
+export const resetUserPassword = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const tempPassword = crypto.randomBytes(4).toString("hex");
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    await User.findByIdAndUpdate(userId, { passwordHash });
+
+    return res.json({
+      success: true,
+      tempPassword,
+      message: "Temporary password generated",
+    });
+
+  } catch (error) {
+    console.error("reset password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+

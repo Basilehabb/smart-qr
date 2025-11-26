@@ -11,6 +11,7 @@ import {
   unlinkQR,
   deleteQR,
   scanAnalytics,
+  resetUserPassword
 } from "../controllers/adminController";
 
 import {
@@ -29,6 +30,8 @@ router.get("/users", listUsers);
 router.post("/users", createUser);
 router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
+router.patch("/users/:userId/reset-password", resetUserPassword);
+
 
 // QR Dashboard (no linking here)
 router.post("/qrs", createQR); // ← Create QR general
