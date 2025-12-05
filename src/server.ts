@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 
+// Routes
 import authRoutes from "./routes/authRoutes";
 import qrRoutes from "./routes/qrRoutes";
 import adminRoutes from "./routes/adminRoutes";
@@ -10,27 +11,30 @@ import adminRoutes from "./routes/adminRoutes";
 dotenv.config();
 const app = express();
 
-// ==============================
-// FIX CORS FOR RENDER
-// ==============================
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+// =====================================
+// ✅ CORS FIX FOR RENDER + VERCEL
+// =====================================
+app.use(
+  cors({
+    origin: [
+      "https://smart-qr-frontend.vercel.app",
+      "http://localhost:3000"
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
+// Handle preflight
+app.options("*", cors());
 
-  next();
-});
-
-app.use(cors());
+// Body parser
 app.use(express.json());
 
-// ==============================
+// =====================================
 // MongoDB
-// ==============================
+// =====================================
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
@@ -46,19 +50,22 @@ mongoose
     console.error(err);
   });
 
-// ==============================
-// Routes
-// ==============================
+// =====================================
+// API ROUTES
+// =====================================
 app.use("/api/auth", authRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
 
+// Test Route
 app.get("/", (req, res) => {
-  res.send("🚀 SmartQR Backend Running on Render...");
+  res.send("🚀 SmartQR Backend Running on Render!");
 });
 
-// ==============================
-// Server
-// ==============================
+// =====================================
+// SERVER START
+// =====================================
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
