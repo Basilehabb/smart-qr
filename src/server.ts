@@ -12,7 +12,33 @@ dotenv.config();
 const app = express();
 
 // =====================================
-// ✅ CORS FIX FOR RENDER + VERCEL
+// ✅ MANUAL CORS HEADERS (ADD THIS FIRST)
+// =====================================
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    "https://smart-qr-frontend.vercel.app",
+    "http://localhost:3000"
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
+// =====================================
+// ✅ CORS PACKAGE (KEEP THIS TOO)
 // =====================================
 app.use(
   cors({
@@ -25,9 +51,6 @@ app.use(
     credentials: true,
   })
 );
-
-// Handle preflight
-app.options("*", cors());
 
 // Body parser
 app.use(express.json());
