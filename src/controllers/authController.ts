@@ -8,12 +8,25 @@ const generateToken = (user: any) => {
     {
       id: user._id,
       isAdmin: user.isAdmin,
-      email: user.email
+      email: user.email,
     },
     process.env.JWT_SECRET as string,
     { expiresIn: "7d" }
   );
 };
+
+/**
+ * Helper: convert profile Maps to plain objects for response
+ */
+function formatProfileFromDoc(userDoc: any) {
+  const formattedProfile: any = {};
+  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+  sections.forEach((section) => {
+    const map = userDoc?.profile?.[section];
+    formattedProfile[section] = map ? Object.fromEntries(map) : {};
+  });
+  return formattedProfile;
+}
 
 // =============================================
 // REGISTER
@@ -31,23 +44,38 @@ export const register = async (req: Request, res: Response) => {
       name,
       email,
       passwordHash: hashed,
-      isAdmin: false
+      isAdmin: false,
+      profile: {
+        social: new Map(),
+        contact: new Map(),
+        payment: new Map(),
+        video: new Map(),
+        music: new Map(),
+        design: new Map(),
+        gaming: new Map(),
+        other: new Map(),
+      },
     });
 
     const token = generateToken(user);
+
+    const userObj: any = user.toObject();
+    userObj.profile = formatProfileFromDoc(user);
+    delete userObj.passwordHash;
 
     res.status(201).json({
       message: "User registered",
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        isAdmin: user.isAdmin
-      }
+        id: userObj._id,
+        name: userObj.name,
+        email: userObj.email,
+        isAdmin: userObj.isAdmin,
+        profile: userObj.profile,
+      },
     });
   } catch (err) {
-    console.error(err);
+    console.error("register error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -69,18 +97,23 @@ export const login = async (req: Request, res: Response) => {
 
     const token = generateToken(user);
 
+    const userObj: any = user.toObject();
+    userObj.profile = formatProfileFromDoc(user);
+    delete userObj.passwordHash;
+
     res.json({
       message: "Login successful",
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        isAdmin: user.isAdmin
-      }
+        id: userObj._id,
+        name: userObj.name,
+        email: userObj.email,
+        isAdmin: userObj.isAdmin,
+        profile: userObj.profile,
+      },
     });
   } catch (error) {
-    console.error(error);
+    console.error("login error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -103,12 +136,26 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
       name: "Admin",
       email: adminEmail,
       passwordHash: hashed,
-      isAdmin: true
+      isAdmin: true,
+      profile: {
+        social: new Map(),
+        contact: new Map(),
+        payment: new Map(),
+        video: new Map(),
+        music: new Map(),
+        design: new Map(),
+        gaming: new Map(),
+        other: new Map(),
+      },
     });
 
-    res.json({ message: "Admin created", admin });
+    const adminObj: any = admin.toObject();
+    adminObj.profile = formatProfileFromDoc(admin);
+    delete adminObj.passwordHash;
+
+    res.json({ message: "Admin created", admin: adminObj });
   } catch (err) {
-    console.error(err);
+    console.error("createAdminIfNotExists error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -118,40 +165,75 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
 // =============================================
 export const getMe = async (req: any, res: Response) => {
   try {
-    const user = await User.findById(req.user.id).select("-passwordHash");
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json({ user });
+    const userObj: any = user.toObject();
+    userObj.profile = formatProfileFromDoc(user);
+    delete userObj.passwordHash;
+
+    res.json({ user: userObj });
   } catch (error) {
-    console.error(error);
+    console.error("getMe error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-// update user profile
+
+// =============================================
+// UPDATE PROFILE (with dynamic Maps support)
+// =============================================
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const { name, email, phone, job, avatar, password } = req.body;
+    const data = req.body;
 
-    const updates: any = {
-      name,
-      email,
-      phone,
-      job,
-      avatar,
-    };
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Remove undefined fields
-    Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
+    // Update normal fields
+    const allowed = ["name", "email", "phone", "job", "avatar"];
+    allowed.forEach((key) => {
+      if (data[key] !== undefined) {
+        (user as any)[key] = data[key];
+      }
+    });
 
-    if (password) {
-      const hashed = await bcrypt.hash(password, 10);
-      updates.passwordHash = hashed;
+    // Update password
+    if (data.password) {
+      const hashed = await bcrypt.hash(data.password, 10);
+      user.passwordHash = hashed;
     }
 
-    const updated = await User.findByIdAndUpdate(userId, updates, { new: true }).select("-passwordHash");
+    // Update maps
+    if (data.profile && typeof data.profile === "object") {
+      if (!user.profile) user.profile = {} as any;
 
-    res.json({ message: "Profile updated", user: updated });
+      for (const [section, values] of Object.entries(data.profile)) {
+        if (!values) continue;
+
+        if (!(user.profile as any)[section]) {
+          (user.profile as any)[section] = new Map();
+        }
+
+        const map = (user.profile as any)[section];
+
+        for (const [key, value] of Object.entries(values)) {
+          if (value === "" || value === null) {
+            map.delete(key);
+          } else {
+            map.set(key, String(value));
+          }
+        }
+      }
+    }
+
+    await user.save();
+
+    const userObj: any = user.toObject();
+    userObj.profile = formatProfileFromDoc(user);
+    delete userObj.passwordHash;
+
+    return res.json({ message: "Profile updated", user: userObj });
   } catch (err) {
     console.error("updateProfile error:", err);
     res.status(500).json({ message: "Server error" });
