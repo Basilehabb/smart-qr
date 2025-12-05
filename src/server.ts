@@ -12,17 +12,12 @@ dotenv.config();
 
 const app = express();
 
-// =======================================
-// ✅ CORS (مسموح فقط للدومينات الخاصة بك)
-// =======================================
+// ==============================
+// CORS — مهم جداً لـ Vercel
+// ==============================
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "https://smart-qr-frontend.vercel.app",
-      "https://smart-qr-platform.vercel.app", // لو هتضيف دومين تاني
-    ],
-    credentials: true,
+    origin: "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -31,7 +26,7 @@ app.use(
 app.use(express.json());
 
 // ==============================
-// 🔌 MongoDB Connection
+// Database Connection
 // ==============================
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -51,21 +46,21 @@ mongoose
   });
 
 // ==============================
-// 🔗 Routes
+// Routes
 // ==============================
 app.use("/api/auth", authRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
 
 // ==============================
-// 🔍 Test Root
+// Test Root Route
 // ==============================
 app.get("/", (req, res) => {
-  res.send("🚀 SmartQR Backend Ready & Running…");
+  res.send("🚀 SmartQR Backend Running on Render...");
 });
 
 // ==============================
-// 🚀 Start Server
+// Start Server
 // ==============================
 const port = process.env.PORT || 4000;
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

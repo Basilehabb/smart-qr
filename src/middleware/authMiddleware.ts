@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import User, { IUser } from "../models/User";
+import User, { UserDocument } from "../models/User";
 
 export interface AuthRequest extends Request {
-  user?: IUser & { role?: string };
+  user?: UserDocument & { isAdmin?: boolean };
 }
 
 /**
@@ -25,14 +25,13 @@ export const verifyToken = async (req: AuthRequest, res: Response, next: NextFun
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
 
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id).select("-passwordHash");
     if (!user) {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
 
-    req.user = user as any;
+    req.user = user;
     next();
-
   } catch (err) {
     console.error("verifyToken error:", err);
     return res.status(401).json({ message: "Unauthorized" });
@@ -49,7 +48,7 @@ export const verifyAdmin = (req: AuthRequest, res: Response, next: NextFunction)
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  if (req.user.role !== "admin") {
+  if (!req.user.isAdmin) {
     return res.status(403).json({ message: "Admin only" });
   }
 
