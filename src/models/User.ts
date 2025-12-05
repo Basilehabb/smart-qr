@@ -4,7 +4,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   phone?: string;
-  password?: string;
+  passwordHash: string;
   role?: string;
   profile?: {
     social?: Map<string, string>;
@@ -16,28 +16,31 @@ export interface IUser extends Document {
     gaming?: Map<string, string>;
     other?: Map<string, string>;
   };
-  createdAt?: Date;
-  updatedAt?: Date;
 }
 
-const UserSchema = new Schema<IUser>({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  phone: { type: String },
-  password: { type: String, required: true },
-  role: { type: String, enum: ["admin", "user"], default: "user" },
+const UserSchema = new Schema<IUser>(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    phone: { type: String },
 
-  profile: {
-    social:   { type: Map, of: String, default: {} },
-    contact:  { type: Map, of: String, default: {} },
-    payment:  { type: Map, of: String, default: {} },
-    video:    { type: Map, of: String, default: {} },
-    music:    { type: Map, of: String, default: {} },
-    design:   { type: Map, of: String, default: {} },
-    gaming:   { type: Map, of: String, default: {} },
-    other:    { type: Map, of: String, default: {} }
-  }
+    // فقط تعديل هنا 👇
+    passwordHash: { type: String, required: true },
 
-}, { timestamps: true });
+    role: { type: String, enum: ["admin", "user"], default: "user" },
+
+    profile: {
+      social: { type: Map, of: String, default: {} },
+      contact: { type: Map, of: String, default: {} },
+      payment: { type: Map, of: String, default: {} },
+      video: { type: Map, of: String, default: {} },
+      music: { type: Map, of: String, default: {} },
+      design: { type: Map, of: String, default: {} },
+      gaming: { type: Map, of: String, default: {} },
+      other: { type: Map, of: String, default: {} },
+    },
+  },
+  { timestamps: true }
+);
 
 export default model<IUser>("User", UserSchema);

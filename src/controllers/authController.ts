@@ -25,13 +25,13 @@ export const register = async (req: Request, res: Response) => {
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: "User already exists" });
 
-    const hashed = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       name,
       email,
-      password: hashed,
-      role: "user", // default
+      passwordHash,
+      role: "user",
     });
 
     const token = generateToken(user);
@@ -63,7 +63,7 @@ export const login = async (req: Request, res: Response) => {
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
-    const isMatch = await bcrypt.compare(password, user.password || "");
+    const isMatch = await bcrypt.compare(password, user.passwordHash || "");
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
 
@@ -97,12 +97,12 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
     if (existingAdmin)
       return res.json({ message: "Admin already exists" });
 
-    const hashed = await bcrypt.hash(adminPassword as string, 10);
+    const passwordHash = await bcrypt.hash(adminPassword as string, 10);
 
     const admin = await User.create({
       name: "Admin",
       email: adminEmail,
-      password: hashed,
+      passwordHash,
       role: "admin",
     });
 
@@ -130,8 +130,9 @@ export const getMe = async (req: any, res: Response) => {
     });
 
     const userObj = user.toObject();
+    (userObj as any).passwordHash = undefined;
+
     userObj.profile = formattedProfile;
-    delete userObj.password;
 
     res.json({ user: userObj });
   } catch (error) {
@@ -141,7 +142,7 @@ export const getMe = async (req: any, res: Response) => {
 };
 
 // =============================================
-// UPDATE PROFILE (with dynamic Maps support)
+// UPDATE PROFILE
 // =============================================
 export const updateProfile = async (req: any, res: Response) => {
   try {
@@ -157,12 +158,12 @@ export const updateProfile = async (req: any, res: Response) => {
       if (data[key] !== undefined) {
         (user as any)[key] = data[key];
       }
-    });    
+    });
 
     // Update password
     if (data.password) {
-      const hashed = await bcrypt.hash(data.password, 10);
-      user.password = hashed;
+      const passwordHash = await bcrypt.hash(data.password, 10);
+      user.passwordHash = passwordHash;
     }
 
     // Update maps
@@ -198,8 +199,9 @@ export const updateProfile = async (req: any, res: Response) => {
     });
 
     const userObj = user.toObject();
+    (userObj as any).passwordHash = undefined;
+
     userObj.profile = formattedProfile;
-    delete userObj.password;
 
     return res.json({ message: "Profile updated", user: userObj });
 
