@@ -58,7 +58,7 @@ export const createUser = async (req: Request, res: Response) => {
       email,
       phone,
       job,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       role: "user",
     });
 
@@ -68,23 +68,13 @@ export const createUser = async (req: Request, res: Response) => {
   }
 };
 
-
 export const getUser = async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.params.userId).select("-passwordHash");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const formattedProfile: any = {};
-    const sections = [
-      "social",
-      "contact",
-      "payment",
-      "video",
-      "music",
-      "design",
-      "gaming",
-      "other",
-    ];
+    const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
     sections.forEach((section) => {
       const map = (user.profile as any)?.[section];
@@ -109,7 +99,6 @@ export const updateUser = async (req: Request, res: Response) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ========== Update basic fields ==========
     const basicFields = ["name", "email", "phone", "job"];
     basicFields.forEach((field) => {
       if (data[field] !== undefined) {
@@ -117,7 +106,13 @@ export const updateUser = async (req: Request, res: Response) => {
       }
     });
 
-    // ========== Update Profile sections ==========
+    // password update
+    if (data.password) {
+      const hashed = await bcrypt.hash(data.password, 10);
+      user.passwordHash = hashed;
+    }
+
+    // profile update
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
@@ -142,19 +137,8 @@ export const updateUser = async (req: Request, res: Response) => {
 
     await user.save();
 
-    // ========== Convert Maps to plain objects ==========
     const formattedProfile: any = {};
-    const sections = [
-      "social",
-      "contact",
-      "payment",
-      "video",
-      "music",
-      "design",
-      "gaming",
-      "other",
-    ];
-
+    const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
     sections.forEach((section) => {
       const map = (user.profile as any)?.[section];
       formattedProfile[section] = map ? Object.fromEntries(map) : {};
@@ -177,67 +161,6 @@ export const deleteUser = async (req: Request, res: Response) => {
 
     res.json({ message: "User deleted" });
   } catch {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * QR MANAGEMENT (Dashboard only)
- */
-export const listQRs = async (req: Request, res: Response) => {
-  const qrs = await QRCode.find().populate("userId", "name email");
-  res.json(qrs);
-};
-
-export const unlinkQR = async (req: Request, res: Response) => {
-  try {
-    await QRCode.findOneAndUpdate({ code: req.params.code }, { userId: null });
-    res.json({ message: "QR unlinked" });
-  } catch {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-export const deleteQR = async (req: Request, res: Response) => {
-  try {
-    await QRCode.deleteOne({ code: req.params.code });
-    res.json({ message: "QR deleted" });
-  } catch {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * Scan Analytics
- */
-export const scanAnalytics = async (req: Request, res: Response) => {
-  try {
-    const logs = await ScanLog.find().sort({ scannedAt: -1 }).limit(100);
-    res.json(logs);
-  } catch {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * reset password
- */
-export const resetPassword = async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.params;
-
-    const tempPassword = crypto.randomBytes(4).toString("hex");
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
-
-    await User.findByIdAndUpdate(userId, { passwordHash });
-
-    return res.json({
-      success: true,
-      tempPassword,
-      message: "Temporary password generated",
-    });
-  } catch (error) {
-    console.error("resetPassword error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
