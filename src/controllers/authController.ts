@@ -7,8 +7,8 @@ const generateToken = (user: any) => {
   return jwt.sign(
     {
       id: user._id,
-      isAdmin: user.isAdmin,
-      email: user.email
+      role: user.role,
+      email: user.email,
     },
     process.env.JWT_SECRET as string,
     { expiresIn: "7d" }
@@ -30,8 +30,8 @@ export const register = async (req: Request, res: Response) => {
     const user = await User.create({
       name,
       email,
-      passwordHash: hashed,
-      isAdmin: false
+      password: hashed,
+      role: "user", // default
     });
 
     const token = generateToken(user);
@@ -43,8 +43,8 @@ export const register = async (req: Request, res: Response) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        isAdmin: user.isAdmin
-      }
+        role: user.role,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -63,7 +63,7 @@ export const login = async (req: Request, res: Response) => {
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash || "");
+    const isMatch = await bcrypt.compare(password, user.password || "");
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
 
@@ -76,8 +76,8 @@ export const login = async (req: Request, res: Response) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        isAdmin: user.isAdmin
-      }
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error(error);
@@ -102,8 +102,8 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
     const admin = await User.create({
       name: "Admin",
       email: adminEmail,
-      passwordHash: hashed,
-      isAdmin: true
+      password: hashed,
+      role: "admin",
     });
 
     res.json({ message: "Admin created", admin });
@@ -114,44 +114,95 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
 };
 
 // =============================================
-// GET LOGGED-IN USER
+// GET ME (formatted profile)
 // =============================================
 export const getMe = async (req: any, res: Response) => {
   try {
-    const user = await User.findById(req.user.id).select("-passwordHash");
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json({ user });
+    const formattedProfile: any = {};
+    const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+
+    sections.forEach(section => {
+      const map = (user.profile as any)?.[section];
+      formattedProfile[section] = map ? Object.fromEntries(map) : {};
+    });
+
+    const userObj = user.toObject();
+    userObj.profile = formattedProfile;
+    delete userObj.password;
+
+    res.json({ user: userObj });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
-// update user profile
+
+// =============================================
+// UPDATE PROFILE (with dynamic Maps support)
+// =============================================
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const { name, email, phone, job, avatar, password } = req.body;
+    const data = req.body;
 
-    const updates: any = {
-      name,
-      email,
-      phone,
-      job,
-      avatar,
-    };
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Remove undefined fields
-    Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
+    // Update normal fields
+    const allowed = ["name", "email", "phone", "job", "avatar"];
+    allowed.forEach((key) => {
+      if (data[key] !== undefined) {
+        (user as any)[key] = data[key];
+      }
+    });    
 
-    if (password) {
-      const hashed = await bcrypt.hash(password, 10);
-      updates.passwordHash = hashed;
+    // Update password
+    if (data.password) {
+      const hashed = await bcrypt.hash(data.password, 10);
+      user.password = hashed;
     }
 
-    const updated = await User.findByIdAndUpdate(userId, updates, { new: true }).select("-passwordHash");
+    // Update maps
+    if (data.profile && typeof data.profile === "object") {
+      if (!user.profile) user.profile = {} as any;
 
-    res.json({ message: "Profile updated", user: updated });
+      for (const [section, values] of Object.entries(data.profile)) {
+        if (!values) continue;
+
+        if (!(user.profile as any)[section]) {
+          (user.profile as any)[section] = new Map();
+        }
+
+        const map = (user.profile as any)[section];
+
+        for (const [key, value] of Object.entries(values)) {
+          if (value === "" || value === null) {
+            map.delete(key);
+          } else {
+            map.set(key, String(value));
+          }
+        }
+      }
+    }
+
+    await user.save();
+
+    const formattedProfile: any = {};
+    const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+    sections.forEach(section => {
+      const map = (user.profile as any)?.[section];
+      formattedProfile[section] = map ? Object.fromEntries(map) : {};
+    });
+
+    const userObj = user.toObject();
+    userObj.profile = formattedProfile;
+    delete userObj.password;
+
+    return res.json({ message: "Profile updated", user: userObj });
+
   } catch (err) {
     console.error("updateProfile error:", err);
     res.status(500).json({ message: "Server error" });

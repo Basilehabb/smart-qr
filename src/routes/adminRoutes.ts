@@ -4,6 +4,7 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 import {
   getOverview,
   listUsers,
+  getUser,
   createUser,
   updateUser,
   deleteUser,
@@ -27,6 +28,7 @@ router.get("/overview", getOverview);
 
 // Users
 router.get("/users", listUsers);
+router.get("/users/:userId", getUser);
 router.post("/users", createUser);
 router.patch("/users/:userId", updateUser);
 router.delete("/users/:userId", deleteUser);
