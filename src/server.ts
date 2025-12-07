@@ -5,8 +5,10 @@ import mongoose from "mongoose";
 
 // Routes
 import authRoutes from "./routes/authRoutes";
+import fieldsRoutes from "./routes/fieldsRoutes";
 import qrRoutes from "./routes/qrRoutes";
 import adminRoutes from "./routes/adminRoutes";
+
 
 dotenv.config();
 const app = express();
@@ -79,6 +81,9 @@ mongoose
 app.use("/api/auth", authRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/fields", fieldsRoutes);
+
+
 
 // Test Route
 app.get("/", (req, res) => {
