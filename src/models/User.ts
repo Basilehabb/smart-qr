@@ -1,101 +1,112 @@
 // path: src/models/User.ts
 import { Schema, model, Document } from "mongoose";
 
+// ⭐ تعريف structure الـ profile item
+interface ProfileItem {
+  key: string;
+  value: string;
+}
+
 export interface UserDocument extends Document {
   name: string;
   email: string;
   phone?: string;
+  countryCode?: string;
   job?: string;
   passwordHash: string;
-
-  // الاسم الموحّد المعتمد الآن
   avatar?: string;
-
   isAdmin: boolean;
 
+  // ⭐⭐⭐ Profile sections as arrays (to preserve order)
   profile?: {
-    social?: Record<string, string>;
-    contact?: Record<string, string>;
-    payment?: Record<string, string>;
-    video?: Record<string, string>;
-    music?: Record<string, string>;
-    design?: Record<string, string>;
-    gaming?: Record<string, string>;
-    other?: Record<string, string>;
+    social?: ProfileItem[];
+    contact?: ProfileItem[];
+    payment?: ProfileItem[];
+    video?: ProfileItem[];
+    music?: ProfileItem[];
+    design?: ProfileItem[];
+    gaming?: ProfileItem[];
+    other?: ProfileItem[];
   };
 
   createdAt: Date;
   updatedAt: Date;
 }
 
+// ⭐ Sub-schema للـ profile items
+const ProfileItemSchema = new Schema(
+  {
+    key: { type: String, required: true },
+    value: { type: String, required: true }
+  },
+  { _id: false } // علشان ما يعمل ObjectId لكل item
+);
+
 const UserSchema = new Schema<UserDocument>(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-
     phone: { type: String, default: "" },
+    countryCode: { type: String, default: "+20" },
     job: { type: String, default: "" },
-
     passwordHash: { type: String, required: true },
-
-    // نعتمد الحقل avatar كسلسلة ثابتة
     avatar: { type: String, default: "" },
-
     isAdmin: { type: Boolean, default: false },
 
-    /**
-     * مهم: نخزن sections كـ plain objects (Schema.Types.Mixed)
-     * هذا يحافظ على ترتيب الحقول كما أُدرجت في الـ frontend.
-     */
+    // ⭐⭐⭐ Profile sections as arrays
     profile: {
-      social: { type: Schema.Types.Mixed, default: {} },
-      contact: { type: Schema.Types.Mixed, default: {} },
-      payment: { type: Schema.Types.Mixed, default: {} },
-      video: { type: Schema.Types.Mixed, default: {} },
-      music: { type: Schema.Types.Mixed, default: {} },
-      design: { type: Schema.Types.Mixed, default: {} },
-      gaming: { type: Schema.Types.Mixed, default: {} },
-      other: { type: Schema.Types.Mixed, default: {} },
-    },
+      social: { type: [ProfileItemSchema], default: [] },
+      contact: { type: [ProfileItemSchema], default: [] },
+      payment: { type: [ProfileItemSchema], default: [] },
+      video: { type: [ProfileItemSchema], default: [] },
+      music: { type: [ProfileItemSchema], default: [] },
+      design: { type: [ProfileItemSchema], default: [] },
+      gaming: { type: [ProfileItemSchema], default: [] },
+      other: { type: [ProfileItemSchema], default: [] }
+    }
   },
   { timestamps: true }
 );
 
 /**
- * Serializer — يحوّل أي Maps الموجودة → plain objects،
- * ويحذف passwordHash من كل استجابة.
+ * ⭐ toJSON method - يحول الـ arrays لـ objects للـ frontend
  */
 UserSchema.methods.toJSON = function () {
   const user = this.toObject();
-
   delete user.passwordHash;
 
-  const sections = [
-    "social",
-    "contact",
-    "payment",
-    "video",
-    "music",
-    "design",
-    "gaming",
-    "other",
-  ];
+  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
   if (user.profile) {
     sections.forEach((sec) => {
-      const value = user.profile[sec];
-      // إذا كان Map (من بيانات قديمة) نحوله
-      if (value instanceof Map) {
-        user.profile[sec] = Object.fromEntries(value);
-      }
-      // إذا كان هناك كائن عادي -- نتركه كما هو (يحافظ على الترتيب)
-      // إذا لا شيء، ضمان أنه object
-      else if (!value) {
+      const arr = user.profile[sec];
+      
+      if (!arr || !Array.isArray(arr)) {
         user.profile[sec] = {};
+        return;
       }
+
+      // ⭐ Convert array → object (preserving order)
+      const obj: Record<string, string> = {};
+      arr.forEach((item: ProfileItem) => {
+        if (item.key && item.value) {
+          obj[item.key] = item.value;
+        }
+      });
+      
+      user.profile[sec] = obj;
     });
   } else {
-    user.profile = {};
+    user.profile = {
+      social: {},
+      contact: {},
+      payment: {},
+      video: {},
+      music: {},
+      design: {},
+      gaming: {},
+      other: {}
+    };
   }
 
   return user;

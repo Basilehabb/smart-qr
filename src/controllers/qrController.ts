@@ -6,45 +6,35 @@ import User from "../models/User";
 import { nanoid } from "nanoid";
 
 /*----------------------------------------
-  Keep keys ordered
-----------------------------------------*/
-function keepOrder(obj: Record<string, any>) {
-  return Object.fromEntries(
-    Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))
-  );
-}
-
-/*----------------------------------------
-  PROFILE FORMATTER (ordered output)
+  ⭐ PROFILE FORMATTER (array → object)
 ----------------------------------------*/
 function formatProfile(user: any) {
   if (!user?.profile) return {};
 
-  const sections = [
-    "social",
-    "contact",
-    "payment",
-    "video",
-    "music",
-    "design",
-    "gaming",
-    "other",
-  ];
-
+  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
   const out: any = {};
 
   sections.forEach((sec) => {
-    const v = user.profile[sec];
+    const arr = user.profile[sec];
+    
+    if (!arr || !Array.isArray(arr)) {
+      out[sec] = {};
+      return;
+    }
 
-    if (!v) out[sec] = {};
-    else if (v instanceof Map) out[sec] = Object.fromEntries(v);
-    else if (typeof v === "object") out[sec] = { ...v }; // ← بدون ترتيب
-    else out[sec] = {};
+    // ⭐ Convert array → object (preserving order)
+    const obj: Record<string, string> = {};
+    arr.forEach((item: any) => {
+      if (item.key && item.value) {
+        obj[item.key] = item.value;
+      }
+    });
+    
+    out[sec] = obj;
   });
 
   return out;
 }
-
 
 /*----------------------------------------
   PUBLIC — QR Scan
@@ -63,14 +53,14 @@ export const getQRDetails = async (req: Request, res: Response) => {
     await ScanLog.create({
       code: qr.code,
       scannedAt: new Date(),
-      userAgent: req.headers["user-agent"] || "unknown",
+      userAgent: req.headers["user-agent"] || "unknown"
     });
 
     if (!qr.userId) {
       return res.json({
         code,
         linked: false,
-        user: null,
+        user: null
       });
     }
 
@@ -87,8 +77,8 @@ export const getQRDetails = async (req: Request, res: Response) => {
         countryCode: user.countryCode || "",
         job: user.job || "",
         avatar: user.avatar || "",
-        profile: formatProfile(user),
-      },
+        profile: formatProfile(user)
+      }
     });
   } catch (err) {
     console.error("QR scan error:", err);

@@ -5,15 +5,6 @@ import jwt from "jsonwebtoken";
 import User from "../models/User";
 
 /*----------------------------------------
-  Keep keys in a stable sorted order
-----------------------------------------*/
-function keepOrder(obj: Record<string, any>) {
-  return Object.fromEntries(
-    Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))
-  );
-}
-
-/*----------------------------------------
   TOKEN GENERATOR
 ----------------------------------------*/
 const generateToken = (user: any) => {
@@ -21,7 +12,7 @@ const generateToken = (user: any) => {
     {
       id: user._id,
       isAdmin: user.isAdmin,
-      email: user.email,
+      email: user.email
     },
     process.env.JWT_SECRET as string,
     { expiresIn: "7d" }
@@ -29,37 +20,33 @@ const generateToken = (user: any) => {
 };
 
 /*----------------------------------------
-  PROFILE MAP FORMATTER (ordered output)
+  ⭐ PROFILE FORMATTER (array → object)
 ----------------------------------------*/
 function formatProfileFromDoc(userDoc: any) {
-  const formattedProfile: any = {};
+  const formatted: any = {};
   const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
   sections.forEach((section) => {
-    const value = userDoc?.profile?.[section];
-
-    if (!value) {
-      formattedProfile[section] = {};
+    const arr = userDoc?.profile?.[section];
+    
+    if (!arr || !Array.isArray(arr)) {
+      formatted[section] = {};
       return;
     }
 
-    if (value instanceof Map) {
-      formattedProfile[section] = Object.fromEntries(value);
-      return;
-    }
-
-    if (typeof value === "object") {
-      // ❗ نرجّعهم كما دخلوا DB بدون ترتيب
-      formattedProfile[section] = { ...value };
-      return;
-    }
-
-    formattedProfile[section] = {};
+    // ⭐ Convert array to object while preserving order
+    const obj: Record<string, string> = {};
+    arr.forEach((item: any) => {
+      if (item.key && item.value) {
+        obj[item.key] = item.value;
+      }
+    });
+    
+    formatted[section] = obj;
   });
 
-  return formattedProfile;
+  return formatted;
 }
-
 
 /*----------------------------------------
   REGISTER
@@ -81,15 +68,15 @@ export const register = async (req: Request, res: Response) => {
       isAdmin: false,
       avatar: "",
       profile: {
-        social: {},
-        contact: {},
-        payment: {},
-        video: {},
-        music: {},
-        design: {},
-        gaming: {},
-        other: {},
-      },
+        social: [],
+        contact: [],
+        payment: [],
+        video: [],
+        music: [],
+        design: [],
+        gaming: [],
+        other: []
+      }
     });
 
     const token = generateToken(user);
@@ -107,8 +94,8 @@ export const register = async (req: Request, res: Response) => {
         email: userObj.email,
         avatar: userObj.avatar,
         isAdmin: userObj.isAdmin,
-        profile: userObj.profile,
-      },
+        profile: userObj.profile
+      }
     });
   } catch (err) {
     console.error("register error:", err);
@@ -146,8 +133,8 @@ export const login = async (req: Request, res: Response) => {
         email: userObj.email,
         avatar: userObj.avatar,
         isAdmin: userObj.isAdmin,
-        profile: userObj.profile,
-      },
+        profile: userObj.profile
+      }
     });
   } catch (error) {
     console.error("login error:", error);
@@ -176,15 +163,15 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
       isAdmin: true,
       avatar: "",
       profile: {
-        social: {},
-        contact: {},
-        payment: {},
-        video: {},
-        music: {},
-        design: {},
-        gaming: {},
-        other: {},
-      },
+        social: [],
+        contact: [],
+        payment: [],
+        video: [],
+        music: [],
+        design: [],
+        gaming: [],
+        other: []
+      }
     });
 
     const adminObj: any = admin.toObject();
@@ -219,7 +206,7 @@ export const getMe = async (req: any, res: Response) => {
 };
 
 /*----------------------------------------
-  UPDATE PROFILE
+  ⭐⭐⭐ UPDATE PROFILE (يحفظ الترتيب)
 ----------------------------------------*/
 export const updateProfile = async (req: any, res: Response) => {
   try {
@@ -230,6 +217,7 @@ export const updateProfile = async (req: any, res: Response) => {
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
+    // Update basic fields
     const allowed = ["name", "email", "phone", "job", "avatar", "countryCode"];
     allowed.forEach((key) => {
       if (data[key] !== undefined) {
@@ -237,52 +225,47 @@ export const updateProfile = async (req: any, res: Response) => {
       }
     });
 
+    // Update password
     if (data.password) {
       const hashed = await bcrypt.hash(data.password, 10);
       user.passwordHash = hashed;
     }
 
+    // ⭐⭐⭐ Update profile sections - PRESERVE ORDER
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
-      for (const [section, values] of Object.entries(data.profile)) {
-        if (!values || typeof values !== "object") continue;
+      const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
-        if (!(user.profile as any)[section]) {
-          (user.profile as any)[section] = {};
+      for (const section of sections) {
+        const incomingObj = data.profile[section];
+        
+        if (!incomingObj || typeof incomingObj !== "object") continue;
+
+        // ⭐ Convert object → array (preserve exact order from frontend)
+        const newArray: any[] = [];
+        
+        // IMPORTANT: Object.entries preserves the order as sent from frontend
+        for (const [key, value] of Object.entries(incomingObj)) {
+          // Skip null/empty values (marked for deletion)
+          if (value === null || value === "") continue;
+          
+          newArray.push({
+            key: key,
+            value: String(value)
+          });
         }
 
-        const targetObj = (user.profile as any)[section];
-
-        for (const [key, value] of Object.entries(values)) {
-          if (value === "" || value === null) {
-            delete targetObj[key];
-          } else {
-            targetObj[key] = String(value);
-          }
-        }
+        // ⭐ Save as array (order is now preserved!)
+        (user.profile as any)[section] = newArray;
       }
+
       user.markModified("profile");
     }
-    
-    const sections = [
-      "social",
-      "contact",
-      "payment",
-      "video",
-      "music",
-      "design",
-      "gaming",
-      "other",
-    ];
-    
-    for (const sec of sections) {
-      user.markModified(`profile.${sec}`);
-    }
-    
 
     await user.save();
 
+    // Return formatted response
     const userObj: any = user.toObject();
     userObj.profile = formatProfileFromDoc(user);
     delete userObj.passwordHash;
