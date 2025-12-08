@@ -262,6 +262,7 @@ export const updateProfile = async (req: any, res: Response) => {
           }
         }
       }
+      user.markModified("profile");
     }
 
     await user.save();
