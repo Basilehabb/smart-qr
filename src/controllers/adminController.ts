@@ -129,7 +129,7 @@ export const updateUser = async (req: Request, res: Response) => {
       }
     });
 
-    // ========== Update profile sections (expect JSON objects) ==========
+    /*// ========== Update profile sections (expect JSON objects) ==========
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
@@ -151,7 +151,27 @@ export const updateUser = async (req: Request, res: Response) => {
         }
       }
     }
+      */
+      // ========== Update profile sections (REPLACE each section entirely) ==========
+      if (data.profile && typeof data.profile === "object") {
+        if (!user.profile) user.profile = {} as any;
 
+        for (const [section, values] of Object.entries(data.profile)) {
+          // section must be object
+          if (!values || typeof values !== "object") continue;
+
+          // create fresh Map to avoid keeping old deleted values
+          const newMap = new Map();
+
+          for (const [key, value] of Object.entries(values)) {
+            if (value !== null && value !== "") {
+              newMap.set(key, String(value));
+            }
+          }
+
+          (user.profile as any)[section] = newMap;
+        }
+      }
     // ========== Optional: update password if provided (admin action) ==========
     if (data.password) {
       const hashed = await bcrypt.hash(String(data.password), 10);
