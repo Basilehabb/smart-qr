@@ -1,7 +1,9 @@
+import { Router } from "express";
 import { upload } from "../middleware/upload";
 import { uploadAvatar } from "../controllers/uploadController";
-import { Router } from "express";
 
 const router = Router();
 
-router.post("/upload-avatar", upload.single("file"), uploadAvatar);
+router.post("/avatar", upload.single("file"), uploadAvatar);
+
+export default router;

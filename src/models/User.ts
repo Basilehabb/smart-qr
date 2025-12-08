@@ -6,8 +6,11 @@ export interface UserDocument extends Document {
   phone?: string;
   job?: string;
   passwordHash: string;
-  avatar?: string;
+
+  avatarUrl?: string;   // ← الاسم الموحد
+
   isAdmin: boolean;
+
   profile?: {
     social?: Map<string, string>;
     contact?: Map<string, string>;
@@ -18,6 +21,7 @@ export interface UserDocument extends Document {
     gaming?: Map<string, string>;
     other?: Map<string, string>;
   };
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,7 +36,7 @@ const UserSchema = new Schema<UserDocument>(
 
     passwordHash: { type: String, required: true },
 
-    avatar: { type: String, default: "" },
+    avatarUrl: { type: String, default: "" }, // ← تعديل هنا
 
     isAdmin: { type: Boolean, default: false },
 
@@ -44,8 +48,8 @@ const UserSchema = new Schema<UserDocument>(
       music: { type: Map, of: String, default: {} },
       design: { type: Map, of: String, default: {} },
       gaming: { type: Map, of: String, default: {} },
-      other: { type: Map, of: String, default: {} }
-    }
+      other: { type: Map, of: String, default: {} },
+    },
   },
   { timestamps: true }
 );

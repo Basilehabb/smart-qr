@@ -3,6 +3,9 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User";
 
+/*----------------------------------------
+  TOKEN GENERATOR
+----------------------------------------*/
 const generateToken = (user: any) => {
   return jwt.sign(
     {
@@ -15,22 +18,24 @@ const generateToken = (user: any) => {
   );
 };
 
-/**
- * Helper: convert profile Maps to plain objects for response
- */
+/*----------------------------------------
+  PROFILE MAP FORMATTER
+----------------------------------------*/
 function formatProfileFromDoc(userDoc: any) {
   const formattedProfile: any = {};
   const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+
   sections.forEach((section) => {
     const map = userDoc?.profile?.[section];
     formattedProfile[section] = map ? Object.fromEntries(map) : {};
   });
+
   return formattedProfile;
 }
 
-// =============================================
-// REGISTER
-// =============================================
+/*----------------------------------------
+  REGISTER
+----------------------------------------*/
 export const register = async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
@@ -45,6 +50,7 @@ export const register = async (req: Request, res: Response) => {
       email,
       passwordHash: hashed,
       isAdmin: false,
+      avatarUrl: null,
       profile: {
         social: new Map(),
         contact: new Map(),
@@ -70,6 +76,7 @@ export const register = async (req: Request, res: Response) => {
         id: userObj._id,
         name: userObj.name,
         email: userObj.email,
+        avatarUrl: userObj.avatarUrl,
         isAdmin: userObj.isAdmin,
         profile: userObj.profile,
       },
@@ -80,9 +87,9 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-// =============================================
-// LOGIN
-// =============================================
+/*----------------------------------------
+  LOGIN
+----------------------------------------*/
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -108,6 +115,7 @@ export const login = async (req: Request, res: Response) => {
         id: userObj._id,
         name: userObj.name,
         email: userObj.email,
+        avatarUrl: userObj.avatarUrl,
         isAdmin: userObj.isAdmin,
         profile: userObj.profile,
       },
@@ -118,9 +126,9 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-// =============================================
-// CREATE ADMIN IF NOT EXISTS
-// =============================================
+/*----------------------------------------
+  ADMIN CREATION
+----------------------------------------*/
 export const createAdminIfNotExists = async (req: Request, res: Response) => {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -137,6 +145,7 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
       email: adminEmail,
       passwordHash: hashed,
       isAdmin: true,
+      avatarUrl: null,
       profile: {
         social: new Map(),
         contact: new Map(),
@@ -160,9 +169,9 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
   }
 };
 
-// =============================================
-// GET LOGGED-IN USER
-// =============================================
+/*----------------------------------------
+  GET ME
+----------------------------------------*/
 export const getMe = async (req: any, res: Response) => {
   try {
     const user = await User.findById(req.user.id);
@@ -179,9 +188,9 @@ export const getMe = async (req: any, res: Response) => {
   }
 };
 
-// =============================================
-// UPDATE PROFILE (with dynamic Maps support)
-// =============================================
+/*----------------------------------------
+  UPDATE PROFILE (Supports avatar, maps)
+----------------------------------------*/
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
@@ -190,21 +199,25 @@ export const updateProfile = async (req: any, res: Response) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Update normal fields
+    // normal fields
     const allowed = ["name", "email", "phone", "job", "avatar"];
     allowed.forEach((key) => {
       if (data[key] !== undefined) {
-        (user as any)[key] = data[key];
+        if (key === "avatar") {
+          user.avatarUrl = data.avatar;
+        } else {
+          (user as any)[key] = data[key];
+        }
       }
     });
 
-    // Update password
+    // password
     if (data.password) {
       const hashed = await bcrypt.hash(data.password, 10);
       user.passwordHash = hashed;
     }
 
-    // Update maps
+    // maps
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
