@@ -10,6 +10,7 @@ import qrRoutes from "./routes/qrRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import authRoutes from "./routes/authRoutes"; // ⬅ مهم جداً
 
+
 dotenv.config();
 const app = express();
 
@@ -83,6 +84,8 @@ app.use("/api/fields", fieldsRoutes);
 
 // ✔️ رفع الملفات (لو ليك مسارات رفع أخرى غير avatar)
 app.use("/api/upload", uploadRoutes);
+app.use("/api/auth", authRoutes);         // ← لليوجينات
+
 
 // ❌ احذف السطر ده نهائيًا
 // app.use("/auth", authRoutes);
