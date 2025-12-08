@@ -264,6 +264,22 @@ export const updateProfile = async (req: any, res: Response) => {
       }
       user.markModified("profile");
     }
+    
+    const sections = [
+      "social",
+      "contact",
+      "payment",
+      "video",
+      "music",
+      "design",
+      "gaming",
+      "other",
+    ];
+    
+    for (const sec of sections) {
+      user.markModified(`profile.${sec}`);
+    }
+    
 
     await user.save();
 
