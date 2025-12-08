@@ -1,22 +1,26 @@
+// path: src/controllers/uploadController.ts
 import { Request, Response } from "express";
-import cloudinary from "../config/cloudinary";
 
-export const uploadAvatar = async (req: Request, res: Response) => {
+/**
+ * Generic upload handler:
+ * - supports: multer local (req.file.path / filename)
+ * - supports: S3/Cloudinary style (req.file.location)
+ *
+ * Returns JSON { url: "..." }
+ */
+export const uploadAvatar = async (req: any, res: Response) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    const file = req.file;
+    if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+    // try common fields
+    const url = file.location || file.path || (file.filename ? `/uploads/${file.filename}` : null);
 
-    const result = await cloudinary.uploader.upload(base64, {
-      folder: "avatars",
-      transformation: [{ width: 400, height: 400, crop: "fill" }],
-    });
+    if (!url) return res.status(500).json({ message: "Could not determine uploaded file URL" });
 
-    return res.json({ url: result.secure_url });
+    return res.json({ url });
   } catch (err) {
-    console.error("Upload failed:", err);
-    return res.status(500).json({ message: "Upload failed" });
+    console.error("uploadAvatar error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };

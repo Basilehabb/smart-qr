@@ -1,3 +1,4 @@
+// path: src/routes/uploadRoutes.ts
 import { Router } from "express";
 import { upload } from "../middleware/upload";
 import { uploadAvatar } from "../controllers/uploadController";

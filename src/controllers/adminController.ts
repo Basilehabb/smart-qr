@@ -8,15 +8,27 @@ import crypto from "crypto";
 /**
  * Helper: convert profile Maps to plain objects for response
  */
-function formatProfileFromDoc(userDoc: any) {
-  const formattedProfile: any = {};
-  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
-  sections.forEach((section) => {
-    const map = userDoc?.profile?.[section];
-    formattedProfile[section] = map ? Object.fromEntries(map) : {};
+function formatProfile(userDoc: any) {
+  const formatted: any = {};
+  const sections = ["social","contact","payment","video","music","design","gaming","other"];
+
+  sections.forEach(sec => {
+    const v = userDoc?.profile?.[sec];
+
+    if (!v) { formatted[sec] = {}; return; }
+
+    if (v instanceof Map) {
+      formatted[sec] = Object.fromEntries(v);
+    } else if (typeof v === "object") {
+      formatted[sec] = { ...v };
+    } else {
+      formatted[sec] = {};
+    }
   });
-  return formattedProfile;
+
+  return formatted;
 }
+
 
 /**
  * Dashboard Overview
@@ -46,7 +58,7 @@ export const listUsers = async (req: Request, res: Response) => {
       const obj = u.toObject();
       obj.qrCount = qrs.filter((q) => q.userId?.toString() === u._id.toString()).length;
       // convert profile maps to plain objects
-      obj.profile = formatProfileFromDoc(u);
+      obj.profile = formatProfile(u);
       return obj;
     });
 
@@ -77,19 +89,19 @@ export const createUser = async (req: Request, res: Response) => {
       passwordHash,
       // ensure profile maps are initialized
       profile: {
-        social: new Map(),
-        contact: new Map(),
-        payment: new Map(),
-        video: new Map(),
-        music: new Map(),
-        design: new Map(),
-        gaming: new Map(),
-        other: new Map(),
+        social: {},
+        contact: {},
+        payment: {},
+        video: {},
+        music: {},
+        design: {},
+        gaming: {},
+        other: {},
       },
     });
 
     const uobj: any = user.toObject();
-    uobj.profile = formatProfileFromDoc(user);
+    uobj.profile = formatProfile(user);
 
     res.json({ user: uobj });
   } catch (err) {
@@ -104,7 +116,7 @@ export const getUser = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const userObj: any = user.toObject();
-    userObj.profile = formatProfileFromDoc(user);
+    userObj.profile = formatProfile(user);
 
     res.json({ user: userObj });
   } catch (err) {
@@ -161,15 +173,16 @@ export const updateUser = async (req: Request, res: Response) => {
           if (!values || typeof values !== "object") continue;
 
           // create fresh Map to avoid keeping old deleted values
-          const newMap = new Map();
+          // Replace each section with a *plain ordered object*
+          const newObj: Record<string, string> = {};
 
           for (const [key, value] of Object.entries(values)) {
             if (value !== null && value !== "") {
-              newMap.set(key, String(value));
+              newObj[key] = String(value); // preserves insertion order
             }
           }
 
-          (user.profile as any)[section] = newMap;
+          (user.profile as any)[section] = newObj;
         }
       }
     // ========== Optional: update password if provided (admin action) ==========
@@ -181,7 +194,7 @@ export const updateUser = async (req: Request, res: Response) => {
     await user.save();
 
     const userObj: any = user.toObject();
-    userObj.profile = formatProfileFromDoc(user);
+    userObj.profile = formatProfile(user);
     delete userObj.passwordHash;
 
     res.json({ user: userObj });

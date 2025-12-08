@@ -1,3 +1,4 @@
+// path: src/controllers/authController.ts
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -20,14 +21,34 @@ const generateToken = (user: any) => {
 
 /*----------------------------------------
   PROFILE MAP FORMATTER
+  (يتعامل مع Maps أو plain objects؛ يُرجع plain objects مرتبة)
 ----------------------------------------*/
 function formatProfileFromDoc(userDoc: any) {
   const formattedProfile: any = {};
   const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
   sections.forEach((section) => {
-    const map = userDoc?.profile?.[section];
-    formattedProfile[section] = map ? Object.fromEntries(map) : {};
+    const value = userDoc?.profile?.[section];
+
+    if (!value) {
+      formattedProfile[section] = {};
+      return;
+    }
+
+    // إذا كان Map (بيانات قديمة) => Object
+    if (value instanceof Map) {
+      formattedProfile[section] = Object.fromEntries(value);
+      return;
+    }
+
+    // إذا كان plain object => حافظ على نفس الترتيب (Object.entries يحتفظ بترتيب المفاتيح كما أدخلت)
+    if (typeof value === "object") {
+      formattedProfile[section] = { ...value };
+      return;
+    }
+
+    // safeguard
+    formattedProfile[section] = {};
   });
 
   return formattedProfile;
@@ -50,16 +71,17 @@ export const register = async (req: Request, res: Response) => {
       email,
       passwordHash: hashed,
       isAdmin: false,
-      avatarUrl: null,
+      // نستخدم avatar (لا avatarUrl)
+      avatar: "",
       profile: {
-        social: new Map(),
-        contact: new Map(),
-        payment: new Map(),
-        video: new Map(),
-        music: new Map(),
-        design: new Map(),
-        gaming: new Map(),
-        other: new Map(),
+        social: {},
+        contact: {},
+        payment: {},
+        video: {},
+        music: {},
+        design: {},
+        gaming: {},
+        other: {},
       },
     });
 
@@ -76,7 +98,7 @@ export const register = async (req: Request, res: Response) => {
         id: userObj._id,
         name: userObj.name,
         email: userObj.email,
-        avatarUrl: userObj.avatarUrl,
+        avatar: userObj.avatar,
         isAdmin: userObj.isAdmin,
         profile: userObj.profile,
       },
@@ -115,7 +137,7 @@ export const login = async (req: Request, res: Response) => {
         id: userObj._id,
         name: userObj.name,
         email: userObj.email,
-        avatarUrl: userObj.avatarUrl,
+        avatar: userObj.avatar,
         isAdmin: userObj.isAdmin,
         profile: userObj.profile,
       },
@@ -145,16 +167,16 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
       email: adminEmail,
       passwordHash: hashed,
       isAdmin: true,
-      avatarUrl: null,
+      avatar: "",
       profile: {
-        social: new Map(),
-        contact: new Map(),
-        payment: new Map(),
-        video: new Map(),
-        music: new Map(),
-        design: new Map(),
-        gaming: new Map(),
-        other: new Map(),
+        social: {},
+        contact: {},
+        payment: {},
+        video: {},
+        music: {},
+        design: {},
+        gaming: {},
+        other: {},
       },
     });
 
@@ -189,7 +211,7 @@ export const getMe = async (req: any, res: Response) => {
 };
 
 /*----------------------------------------
-  UPDATE PROFILE (Supports avatar, maps)
+  UPDATE PROFILE (Supports avatar, plain objects in profile)
 ----------------------------------------*/
 export const updateProfile = async (req: any, res: Response) => {
   try {
@@ -200,14 +222,10 @@ export const updateProfile = async (req: any, res: Response) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // normal fields
-    const allowed = ["name", "email", "phone", "job", "avatar"];
+    const allowed = ["name", "email", "phone", "job", "avatar", "countryCode"];
     allowed.forEach((key) => {
       if (data[key] !== undefined) {
-        if (key === "avatar") {
-          user.avatar = data.avatar;
-        } else {
-          (user as any)[key] = data[key];
-        }
+        (user as any)[key] = data[key];
       }
     });
 
@@ -217,24 +235,30 @@ export const updateProfile = async (req: any, res: Response) => {
       user.passwordHash = hashed;
     }
 
-    // maps
+    // profile: expect plain objects preserving order
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
       for (const [section, values] of Object.entries(data.profile)) {
-        if (!values) continue;
+        if (!values || typeof values !== "object") continue;
 
-        if (!(user.profile as any)[section]) {
-          (user.profile as any)[section] = new Map();
+        // ensure target is plain object
+        if (!(user.profile as any)[section] || typeof (user.profile as any)[section] !== "object") {
+          (user.profile as any)[section] = {};
         }
 
-        const map = (user.profile as any)[section];
+        const targetObj = (user.profile as any)[section] as Record<string, string>;
 
-        for (const [key, value] of Object.entries(values)) {
+        // apply each key:
+        for (const [key, value] of Object.entries(values as Record<string, any>)) {
           if (value === "" || value === null) {
-            map.delete(key);
+            // delete key if exists
+            if (Object.prototype.hasOwnProperty.call(targetObj, key)) {
+              delete targetObj[key];
+            }
           } else {
-            map.set(key, String(value));
+            // set/update while preserving insertion order: assign directly
+            targetObj[key] = String(value);
           }
         }
       }
@@ -243,6 +267,7 @@ export const updateProfile = async (req: any, res: Response) => {
     await user.save();
 
     const userObj: any = user.toObject();
+    // ensure profile sections are plain objects (formatting)
     userObj.profile = formatProfileFromDoc(user);
     delete userObj.passwordHash;
 
