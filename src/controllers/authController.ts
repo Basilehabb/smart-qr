@@ -204,7 +204,7 @@ export const updateProfile = async (req: any, res: Response) => {
     allowed.forEach((key) => {
       if (data[key] !== undefined) {
         if (key === "avatar") {
-          user.avatarUrl = data.avatar;
+          user.avatar = data.avatar;
         } else {
           (user as any)[key] = data[key];
         }

@@ -7,7 +7,7 @@ export interface UserDocument extends Document {
   job?: string;
   passwordHash: string;
 
-  avatarUrl?: string;   // ← الاسم الموحد
+  avatar?: string;        // ← الاسم الموحّد المعتمد
 
   isAdmin: boolean;
 
@@ -36,7 +36,7 @@ const UserSchema = new Schema<UserDocument>(
 
     passwordHash: { type: String, required: true },
 
-    avatarUrl: { type: String, default: "" }, // ← تعديل هنا
+    avatar: { type: String, default: "" }, // ← ثابت
 
     isAdmin: { type: Boolean, default: false },
 
@@ -49,9 +49,39 @@ const UserSchema = new Schema<UserDocument>(
       design: { type: Map, of: String, default: {} },
       gaming: { type: Map, of: String, default: {} },
       other: { type: Map, of: String, default: {} },
-    },
+    }
   },
   { timestamps: true }
 );
+
+/** 
+ * 🔥 Serializer — يحوّل Maps → Objects في كل Response
+ */
+UserSchema.methods.toJSON = function () {
+  const user = this.toObject();
+
+  delete user.passwordHash;
+
+  const sections = [
+    "social",
+    "contact",
+    "payment",
+    "video",
+    "music",
+    "design",
+    "gaming",
+    "other",
+  ];
+
+  if (user.profile) {
+    sections.forEach((sec) => {
+      if (user.profile[sec] instanceof Map) {
+        user.profile[sec] = Object.fromEntries(user.profile[sec]);
+      }
+    });
+  }
+
+  return user;
+};
 
 export default model<UserDocument>("User", UserSchema);
