@@ -5,6 +5,15 @@ import jwt from "jsonwebtoken";
 import User from "../models/User";
 
 /*----------------------------------------
+  Keep keys in a stable sorted order
+----------------------------------------*/
+function keepOrder(obj: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))
+  );
+}
+
+/*----------------------------------------
   TOKEN GENERATOR
 ----------------------------------------*/
 const generateToken = (user: any) => {
@@ -20,12 +29,20 @@ const generateToken = (user: any) => {
 };
 
 /*----------------------------------------
-  PROFILE MAP FORMATTER
-  (يتعامل مع Maps أو plain objects؛ يُرجع plain objects مرتبة)
+  PROFILE MAP FORMATTER (ordered output)
 ----------------------------------------*/
 function formatProfileFromDoc(userDoc: any) {
   const formattedProfile: any = {};
-  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+  const sections = [
+    "social",
+    "contact",
+    "payment",
+    "video",
+    "music",
+    "design",
+    "gaming",
+    "other",
+  ];
 
   sections.forEach((section) => {
     const value = userDoc?.profile?.[section];
@@ -35,20 +52,15 @@ function formatProfileFromDoc(userDoc: any) {
       return;
     }
 
-    // إذا كان Map (بيانات قديمة) => Object
+    let plain: any = {};
+
     if (value instanceof Map) {
-      formattedProfile[section] = Object.fromEntries(value);
-      return;
+      plain = Object.fromEntries(value);
+    } else if (typeof value === "object") {
+      plain = { ...value };
     }
 
-    // إذا كان plain object => حافظ على نفس الترتيب (Object.entries يحتفظ بترتيب المفاتيح كما أدخلت)
-    if (typeof value === "object") {
-      formattedProfile[section] = { ...value };
-      return;
-    }
-
-    // safeguard
-    formattedProfile[section] = {};
+    formattedProfile[section] = keepOrder(plain);
   });
 
   return formattedProfile;
@@ -62,7 +74,8 @@ export const register = async (req: Request, res: Response) => {
     const { name, email, password } = req.body;
 
     const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: "User already exists" });
+    if (existing)
+      return res.status(400).json({ message: "User already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
 
@@ -71,7 +84,6 @@ export const register = async (req: Request, res: Response) => {
       email,
       passwordHash: hashed,
       isAdmin: false,
-      // نستخدم avatar (لا avatarUrl)
       avatar: "",
       profile: {
         social: {},
@@ -197,7 +209,8 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
 export const getMe = async (req: any, res: Response) => {
   try {
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
     const userObj: any = user.toObject();
     userObj.profile = formatProfileFromDoc(user);
@@ -211,7 +224,7 @@ export const getMe = async (req: any, res: Response) => {
 };
 
 /*----------------------------------------
-  UPDATE PROFILE (Supports avatar, plain objects in profile)
+  UPDATE PROFILE
 ----------------------------------------*/
 export const updateProfile = async (req: any, res: Response) => {
   try {
@@ -219,9 +232,9 @@ export const updateProfile = async (req: any, res: Response) => {
     const data = req.body;
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
-    // normal fields
     const allowed = ["name", "email", "phone", "job", "avatar", "countryCode"];
     allowed.forEach((key) => {
       if (data[key] !== undefined) {
@@ -229,35 +242,27 @@ export const updateProfile = async (req: any, res: Response) => {
       }
     });
 
-    // password
     if (data.password) {
       const hashed = await bcrypt.hash(data.password, 10);
       user.passwordHash = hashed;
     }
 
-    // profile: expect plain objects preserving order
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
       for (const [section, values] of Object.entries(data.profile)) {
         if (!values || typeof values !== "object") continue;
 
-        // ensure target is plain object
-        if (!(user.profile as any)[section] || typeof (user.profile as any)[section] !== "object") {
+        if (!(user.profile as any)[section]) {
           (user.profile as any)[section] = {};
         }
 
-        const targetObj = (user.profile as any)[section] as Record<string, string>;
+        const targetObj = (user.profile as any)[section];
 
-        // apply each key:
-        for (const [key, value] of Object.entries(values as Record<string, any>)) {
+        for (const [key, value] of Object.entries(values)) {
           if (value === "" || value === null) {
-            // delete key if exists
-            if (Object.prototype.hasOwnProperty.call(targetObj, key)) {
-              delete targetObj[key];
-            }
+            delete targetObj[key];
           } else {
-            // set/update while preserving insertion order: assign directly
             targetObj[key] = String(value);
           }
         }
@@ -268,7 +273,6 @@ export const updateProfile = async (req: any, res: Response) => {
     await user.save();
 
     const userObj: any = user.toObject();
-    // ensure profile sections are plain objects (formatting)
     userObj.profile = formatProfileFromDoc(user);
     delete userObj.passwordHash;
 
