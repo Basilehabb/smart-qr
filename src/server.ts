@@ -10,6 +10,7 @@ import qrRoutes from "./routes/qrRoutes";
 import adminRoutes from "./routes/adminRoutes";
 
 
+
 dotenv.config();
 const app = express();
 
@@ -82,6 +83,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/fields", fieldsRoutes);
+app.use("/auth", authRoutes);
+
 
 
 
