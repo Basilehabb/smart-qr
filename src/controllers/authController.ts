@@ -33,16 +33,7 @@ const generateToken = (user: any) => {
 ----------------------------------------*/
 function formatProfileFromDoc(userDoc: any) {
   const formattedProfile: any = {};
-  const sections = [
-    "social",
-    "contact",
-    "payment",
-    "video",
-    "music",
-    "design",
-    "gaming",
-    "other",
-  ];
+  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
   sections.forEach((section) => {
     const value = userDoc?.profile?.[section];
@@ -52,19 +43,23 @@ function formatProfileFromDoc(userDoc: any) {
       return;
     }
 
-    let plain: any = {};
-
     if (value instanceof Map) {
-      plain = Object.fromEntries(value);
-    } else if (typeof value === "object") {
-      plain = { ...value };
+      formattedProfile[section] = Object.fromEntries(value);
+      return;
     }
 
-    formattedProfile[section] = keepOrder(plain);
+    if (typeof value === "object") {
+      // ❗ نرجّعهم كما دخلوا DB بدون ترتيب
+      formattedProfile[section] = { ...value };
+      return;
+    }
+
+    formattedProfile[section] = {};
   });
 
   return formattedProfile;
 }
+
 
 /*----------------------------------------
   REGISTER

@@ -36,17 +36,15 @@ function formatProfile(user: any) {
   sections.forEach((sec) => {
     const v = user.profile[sec];
 
-    let plain: any = {};
-
-    if (!v) plain = {};
-    else if (v instanceof Map) plain = Object.fromEntries(v);
-    else if (typeof v === "object") plain = { ...v };
-
-    out[sec] = keepOrder(plain);
+    if (!v) out[sec] = {};
+    else if (v instanceof Map) out[sec] = Object.fromEntries(v);
+    else if (typeof v === "object") out[sec] = { ...v }; // ← بدون ترتيب
+    else out[sec] = {};
   });
 
   return out;
 }
+
 
 /*----------------------------------------
   PUBLIC — QR Scan
