@@ -371,7 +371,7 @@ export const updateUserProfileAdmin = async (req: Request, res: Response) => {
       user.passwordHash = await bcrypt.hash(String(data.password), 10);
     }
 
-    // ⭐⭐⭐ Update profile sections (object → array)
+    // Update profile sections (object → array)
     if (data.profile && typeof data.profile === "object") {
       const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
 
@@ -381,7 +381,6 @@ export const updateUserProfileAdmin = async (req: Request, res: Response) => {
         if (incoming && typeof incoming === "object") {
           const arr: any[] = [];
 
-          // ⭐ Object.entries preserves order from frontend
           for (const [key, value] of Object.entries(incoming)) {
             if (value !== null && value !== "") {
               arr.push({ key, value: String(value) });
