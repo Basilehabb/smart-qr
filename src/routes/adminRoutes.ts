@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
+import { upload } from "../middleware/upload";
+import { bulkUploadUsers, downloadTemplate } from "../controllers/adminController";
 
 import {
   getOverview,
   listUsers,
   createUser,
-  updateUser,
+  updateUserProfileAdmin,
   deleteUser,
   listQRs,
   unlinkQR,
@@ -29,7 +31,7 @@ router.get("/overview", getOverview);
 // Users
 router.get("/users", listUsers);
 router.post("/users", createUser);
-router.patch("/users/:userId", updateUser);
+router.put("/users/:userId", updateUserProfileAdmin);
 router.delete("/users/:userId", deleteUser);
 router.post("/users/:userId/reset-password", resetPassword);
 
@@ -50,3 +52,7 @@ router.patch("/users/:userId/qrs/link", linkExistingQRToUser); // ← Link exist
 router.get("/scan-analytics", scanAnalytics);
 
 export default router;
+
+// Add these routes
+router.post("/users/bulk-upload", upload.single("file"), bulkUploadUsers);
+router.get("/users/template", downloadTemplate);
