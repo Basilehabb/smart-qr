@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 import { upload } from "../middleware/upload";
-import { bulkUploadUsers, downloadTemplate } from "../controllers/adminController";
 
 import {
+  bulkUploadUsers,
   getOverview,
   listUsers,
   createUser,
@@ -13,7 +13,8 @@ import {
   unlinkQR,
   deleteQR,
   scanAnalytics,
-  resetPassword
+  resetPassword,
+  downloadTemplate
 } from "../controllers/adminController";
 
 import {
@@ -37,8 +38,8 @@ router.post("/users/:userId/reset-password", resetPassword);
 
 
 
-// QR Dashboard (no linking here)
-router.post("/qrs", createQR); // ← Create QR general
+// QR Dashboard 
+router.post("/qrs", createQR); 
 router.get("/qrs", listQRs);
 router.patch("/qrs/:code/unlink", unlinkQR);
 router.delete("/qrs/:code", deleteQR);
@@ -53,6 +54,6 @@ router.get("/scan-analytics", scanAnalytics);
 
 export default router;
 
-// Add these routes
+// Bulk upload
 router.post("/users/bulk-upload", upload.single("file"), bulkUploadUsers);
 router.get("/users/template", downloadTemplate);

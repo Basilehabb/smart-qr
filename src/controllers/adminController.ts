@@ -225,26 +225,131 @@ export const getOverview = async (req: Request, res: Response) => {
 ====================================================== */
 export const listUsers = async (req: Request, res: Response) => {
   try {
-    const users = await User.find().select("-passwordHash");
-    const qrs = await QRCode.find();
+    // Parse query params
+    const {
+    search,
+    isAdmin,
+    hasQR,
+    job,
+    phoneExists,
+    createdFrom,
+    createdTo,
+    sort,
+    } = req.query as any;
+    const page = Math.max(1, parseInt((req.query.page as string) || "1")) || 1;
+    const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "20"))) || 20;
+    
+    
+    // Build Mongo filter
+    const filter: any = {};
+    
+    
+    if (search && String(search).trim()) {
+    const s = String(search).trim();
+    filter.$or = [
+    { name: { $regex: s, $options: "i" } },
+    { email: { $regex: s, $options: "i" } },
+    { phone: { $regex: s, $options: "i" } },
+    { job: { $regex: s, $options: "i" } },
+    ];
+    }
+    if (isAdmin === "true") filter.isAdmin = true;
+else if (isAdmin === "false") filter.isAdmin = false;
 
-    const enriched = users.map((u: any) => {
-      const obj = u.toObject();
-      obj.qrCount = qrs.filter(q => q.userId?.toString() === u._id.toString()).length;
-      
-      // ⭐ Format profile: array → object
-      obj.profile = formatProfile(u);
-      
-      return obj;
-    });
 
-    res.json({ users: enriched });
+if (job && String(job).trim()) filter.job = String(job).trim();
 
-  } catch (err) {
-    console.error("listUsers error:", err);
-    res.status(500).json({ message: "Server error" });
+
+if (phoneExists === "true") filter.phone = { $exists: true, $ne: "" };
+else if (phoneExists === "false") filter.$or = (filter.$or || []).concat([{ phone: "" }, { phone: { $exists: false } }]);
+
+
+// createdAt range
+if (createdFrom || createdTo) {
+filter.createdAt = {} as any;
+if (createdFrom) filter.createdAt.$gte = new Date(String(createdFrom));
+if (createdTo) {
+const d = new Date(String(createdTo));
+// include end of day if user passed date-only
+d.setHours(23, 59, 59, 999);
+filter.createdAt.$lte = d;
+}
+}
+
+// Count total (for pagination) — apply same filter
+const total = await User.countDocuments(filter);
+
+
+// Sorting
+let sortObj: any = { createdAt: -1 };
+switch (sort) {
+case "oldest":
+sortObj = { createdAt: 1 };
+break;
+case "name_asc":
+sortObj = { name: 1 };
+break;
+case "name_desc":
+sortObj = { name: -1 };
+break;
+case "email_asc":
+sortObj = { email: 1 };
+break;
+case "email_desc":
+sortObj = { email: -1 };
+break;
+default:
+sortObj = { createdAt: -1 };
+}
+
+// Fetch users with pagination
+const users = await User.find(filter)
+.select("-passwordHash")
+.sort(sortObj)
+.skip((page - 1) * limit)
+.limit(limit)
+.lean();
+
+// If hasQR filter applied, we need to filter by QR join
+let qrs: any[] = [];
+if (hasQR === "true" || hasQR === "false") {
+qrs = await QRCode.find({ userId: { $ne: null } }).lean();
+} else {
+qrs = await QRCode.find().lean();
+}
+
+// Enrich users with qrCount and format profile
+const enriched = users.map((u: any) => {
+  const qrCount = qrs.filter((q) => q.userId && String(q.userId) === String(u._id)).length;
+  const out = { ...u };
+  out.qrCount = qrCount;
+  out.profile = formatProfile(u);
+  return out;
+  });
+
+  // If hasQR filter true => keep only users with qrCount > 0
+let final = enriched;
+if (hasQR === "true") final = enriched.filter((x) => x.qrCount > 0);
+else if (hasQR === "false") final = enriched.filter((x) => x.qrCount === 0);
+
+
+// Note: if we filtered by hasQR after pagination it could shrink page size — better approach would be aggregation; this is simple and acceptable for moderate dataset.
+
+
+return res.json({
+  users: final,
+  meta: {
+  total,
+  page,
+  limit,
+  pages: Math.ceil(total / limit) || 1,
+  },
+  });
+  } catch (err: any) {
+  console.error("listUsers error:", err);
+  res.status(500).json({ message: "Server error" });
   }
-};
+  };
 
 /* ======================================================
    5) CREATE USER
