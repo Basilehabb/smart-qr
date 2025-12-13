@@ -397,16 +397,24 @@ export const createUser = async (req: Request, res: Response) => {
 };
 
 /* ======================================================
-   6) GET USER (WITH FORMATTED PROFILE)
+   6) GET USER (WITH PROFILE + LINKED QR CODES)
 ====================================================== */
 export const getUser = async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.params.userId).select("-passwordHash");
+    const userId = req.params.userId;
 
+    const user = await User.findById(userId).select("-passwordHash");
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // ⭐ Get all QR codes linked to this user
+    const qrCodes = await QRCode.find({ userId }).select("code createdAt");
+
+    // ⭐ Format profile correctly
     const userObj: any = user.toObject();
     userObj.profile = formatProfile(user);
+
+    // ⭐ Include linked QR codes in response
+    userObj.qrCodes = qrCodes;
 
     return res.json({ user: userObj });
 
@@ -415,6 +423,7 @@ export const getUser = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /* ======================================================
    7) UPDATE USER (BASIC FIELDS ONLY - NO PROFILE)
