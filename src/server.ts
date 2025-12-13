@@ -19,7 +19,7 @@ const app = express();
 // =====================================
 app.use((req, res, next) => {
   const allowedOrigins = [
-    "https://smart-qr-frontend.vercel.app",
+    "https://loly-for-accessories.vercel.app",
     "http://localhost:3000"
   ];
 
@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 app.use(
   cors({
     origin: [
-      "https://smart-qr-frontend.vercel.app",
+      "https://loly-for-accessories.vercel.app",
       "http://localhost:3000",
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
