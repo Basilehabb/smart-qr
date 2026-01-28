@@ -14,7 +14,8 @@ import {
   deleteQR,
   scanAnalytics,
   resetPassword,
-  downloadTemplate
+  downloadTemplate,
+  uploadUserAvatarAdmin
 } from "../controllers/adminController";
 
 import {
@@ -35,6 +36,12 @@ router.post("/users", createUser);
 router.put("/users/:userId", updateUserProfileAdmin);
 router.delete("/users/:userId", deleteUser);
 router.post("/users/:userId/reset-password", resetPassword);
+router.post(
+  "/users/:userId/avatar",
+  upload.single("file"),
+  uploadUserAvatarAdmin
+);
+
 
 
 

@@ -612,3 +612,49 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+// ======================================================
+// 13) UPLOAD USER AVATAR (ADMIN ONLY)
+// ======================================================
+import cloudinary from "../config/cloudinary";
+import streamifier from "streamifier";
+
+export const uploadUserAvatarAdmin = async (req: any, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // امسح الصورة القديمة لو موجودة
+    if ((user as any).avatarPublicId) {
+      await cloudinary.uploader.destroy((user as any).avatarPublicId);
+    }
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { folder: "avatars", resource_type: "image" },
+      async (error, result) => {
+        if (error || !result) {
+          return res.status(500).json({ message: "Upload failed" });
+        }
+
+        user.avatar = result.secure_url;
+        (user as any).avatarPublicId = result.public_id;
+        await user.save();
+
+        return res.json({ url: result.secure_url });
+      }
+    );
+
+    streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+
+  } catch (err) {
+    console.error("uploadUserAvatarAdmin error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
