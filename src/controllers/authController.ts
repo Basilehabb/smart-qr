@@ -53,7 +53,7 @@ function formatProfileFromDoc(userDoc: any) {
 ----------------------------------------*/
 export const register = async (req: Request, res: Response) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, phone, job, avatar } = req.body;
 
     const existing = await User.findOne({ email });
     if (existing)
@@ -65,8 +65,10 @@ export const register = async (req: Request, res: Response) => {
       name,
       email,
       passwordHash: hashed,
+      phone: phone || "",
+      job: job || "",
+      avatar: avatar || "",
       isAdmin: false,
-      avatar: "",
       profile: {
         social: [],
         contact: [],
@@ -85,13 +87,15 @@ export const register = async (req: Request, res: Response) => {
     userObj.profile = formatProfileFromDoc(user);
     delete userObj.passwordHash;
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "User registered",
       token,
       user: {
         id: userObj._id,
         name: userObj.name,
         email: userObj.email,
+        phone: userObj.phone,
+        job: userObj.job,
         avatar: userObj.avatar,
         isAdmin: userObj.isAdmin,
         profile: userObj.profile
@@ -99,9 +103,10 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("register error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /*----------------------------------------
   LOGIN
