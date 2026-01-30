@@ -752,43 +752,50 @@ export const bulkUploadUserAvatars = async (req: any, res: Response) => {
       failed: [] as any[],
     };
 
-    for (const file of req.files) {
-      const originalName = file.originalname;
-      const email = originalName.split(".")[0]; // email.jpg
+    const uploads = req.files.map((file: any) => {
+      return new Promise<void>(async (resolve) => {
+        const originalName = file.originalname;
+        const email = originalName.replace(/\.(jpg|jpeg|png|webp)$/i, "");
 
-      const user = await User.findOne({ email });
-      if (!user) {
-        results.failed.push({
-          file: originalName,
-          error: "User not found",
-        });
-        continue;
-      }
-
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: "avatars", resource_type: "image" },
-        async (error, result) => {
-          if (error || !result) {
-            results.failed.push({
-              file: originalName,
-              error: "Upload failed",
-            });
-            return;
-          }
-
-          user.avatar = result.secure_url;
-          (user as any).avatarPublicId = result.public_id;
-          await user.save();
-
-          results.success.push({
-            email,
-            avatar: result.secure_url,
+        const user = await User.findOne({ email });
+        if (!user) {
+          results.failed.push({
+            file: originalName,
+            error: "User not found",
           });
+          return resolve();
         }
-      );
 
-      streamifier.createReadStream(file.buffer).pipe(uploadStream);
-    }
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: "avatars", resource_type: "image" },
+          async (error, result) => {
+            if (error || !result) {
+              results.failed.push({
+                file: originalName,
+                error: "Upload failed",
+              });
+              return resolve();
+            }
+
+            user.avatar = result.secure_url;
+            (user as any).avatarPublicId = result.public_id;
+            await user.save();
+
+            results.success.push({
+              email,
+              avatar: result.secure_url,
+            });
+
+            resolve();
+          }
+        );
+
+        streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      });
+    });
+
+    // 🔥 استنى كل الصور تترفع
+    await Promise.all(uploads);
 
     return res.json({
       message: "Bulk avatar upload finished",
@@ -800,4 +807,5 @@ export const bulkUploadUserAvatars = async (req: any, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
