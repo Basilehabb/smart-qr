@@ -7,6 +7,61 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { createUserService } from "../services/userService";
 
+/* =====================
+   LINK NORMALIZER (USED IN BULK UPLOAD)
+===================== */
+function normalizeLink(type: string, value: string): string {
+  if (!value) return "";
+
+  const v = String(value).trim();
+
+  if (
+    v.startsWith("http://") ||
+    v.startsWith("https://") ||
+    v.startsWith("tel:") ||
+    v.startsWith("mailto:")
+  ) {
+    return v;
+  }
+
+  switch (type) {
+    case "facebook":
+      return `https://www.facebook.com/${v.replace(/^@/, "")}/`;
+
+    case "instagram":
+      return `https://www.instagram.com/${v.replace(/^@/, "")}`;
+
+    case "tiktok":
+      return `https://www.tiktok.com/@${v.replace(/^@/, "")}`;
+
+    case "youtube":
+      return `https://www.youtube.com/@${v.replace(/^@/, "")}`;
+
+    case "whatsapp": {
+      const num = v.replace(/\D/g, "").replace(/^0/, "20");
+      return `https://wa.me/${num}`;
+    }
+
+    case "phone": {
+      const num = v.replace(/\D/g, "").replace(/^0/, "20");
+      return `tel:+${num}`;
+    }
+
+    case "email":
+      return `mailto:${v}`;
+
+    case "website":
+      return v.startsWith("http") ? v : `https://${v}`;
+
+    case "paypal":
+      return `https://paypal.me/${v}`;
+
+    default:
+      return v;
+  }
+}
+
+
 /* ======================================================
    HELPER: Format Profile (Array → Object)
 ====================================================== */
@@ -94,6 +149,43 @@ export const bulkUploadUsers = async (req: Request, res: Response) => {
           avatar: row.avatar
         });
 
+        /* =====================
+   BUILD PROFILE FROM EXCEL
+          ===================== */
+          const profile: any = {
+            social: {},
+            contact: {},
+            payment: {},
+            other: {}
+          };
+
+          if (row.instagram) profile.social.instagram = normalizeLink("instagram", row.instagram);
+          if (row.facebook) profile.social.facebook = normalizeLink("facebook", row.facebook);
+          if (row.tiktok) profile.social.tiktok = normalizeLink("tiktok", row.tiktok);
+          if (row.youtube) profile.social.youtube = normalizeLink("youtube", row.youtube);
+
+          if (row.whatsapp) profile.contact.whatsapp = normalizeLink("whatsapp", row.whatsapp);
+          if (row.publicEmail) profile.contact.email = normalizeLink("email", row.publicEmail);
+          if (row.phoneLink) profile.contact.phone = normalizeLink("phone", row.phoneLink);
+
+          if (row.paypal) profile.payment.paypal = normalizeLink("paypal", row.paypal);
+          if (row.website) profile.other.website = normalizeLink("website", row.website);
+
+          if (
+            Object.values(profile).some(
+              (sec) => Object.keys(sec as Record<string, any>).length > 0
+            )
+          ) {          
+            await User.findByIdAndUpdate(user._id, {
+              profile: {
+                social: Object.entries(profile.social).map(([k, v]) => ({ key: k, value: v })),
+                contact: Object.entries(profile.contact).map(([k, v]) => ({ key: k, value: v })),
+                payment: Object.entries(profile.payment).map(([k, v]) => ({ key: k, value: v })),
+                other: Object.entries(profile.other).map(([k, v]) => ({ key: k, value: v })),
+              }
+            });
+          }
+          
         let qr: any;
 
         if (row.qrCode) {
@@ -158,22 +250,25 @@ export const downloadTemplate = async (req: Request, res: Response) => {
       {
         name: "John Doe",
         email: "john@example.com",
-        phone: "+201234567890",
+        phone: "01234567890",
         job: "Engineer",
-        password: "optional123",
-        qrCode: "ABC123",
-        avatar: "",
-      },
-      {
-        name: "Jane Smith",
-        email: "jane@example.com",
-        phone: "+201987654321",
-        job: "Designer",
         password: "",
         qrCode: "",
-        avatar: "",
+    
+        instagram: "john_doe",
+        facebook: "john.doe",
+        tiktok: "",
+        youtube: "",
+    
+        whatsapp: "01234567890",
+        publicEmail: "contact@example.com",
+        phoneLink: "01234567890",
+    
+        paypal: "",
+        website: "example.com"
       }
     ];
+    
 
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
