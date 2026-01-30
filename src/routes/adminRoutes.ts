@@ -28,7 +28,6 @@ import {
 
 const router = Router();
 
-router.use(verifyToken as any, verifyAdmin as any);
 router.get("/overview", getOverview);
 
 // Bulk upload
