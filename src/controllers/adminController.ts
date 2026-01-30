@@ -67,7 +67,7 @@ function normalizeLink(type: string, value: string): string {
 ====================================================== */
 function formatProfile(userDoc: any) {
   const formatted: any = {};
-  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+  const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
 
   sections.forEach(section => {
     const arr = userDoc?.profile?.[section];
@@ -567,7 +567,7 @@ export const updateUserProfileAdmin = async (req: Request, res: Response) => {
 
     // Update profile sections (object → array)
     if (data.profile && typeof data.profile === "object") {
-      const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+      const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
 
       for (const section of sections) {
         const incoming = data.profile[section];

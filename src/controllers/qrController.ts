@@ -11,7 +11,7 @@ import { nanoid } from "nanoid";
 function formatProfile(user: any) {
   if (!user?.profile) return {};
 
-  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+  const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
   const out: any = {};
 
   sections.forEach((sec) => {

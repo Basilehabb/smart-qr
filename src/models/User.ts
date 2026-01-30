@@ -19,8 +19,8 @@ export interface UserDocument extends Document {
 
   // ⭐⭐⭐ Profile sections as arrays (to preserve order)
   profile?: {
-    social?: ProfileItem[];
     contact?: ProfileItem[];
+    social?: ProfileItem[];
     payment?: ProfileItem[];
     video?: ProfileItem[];
     music?: ProfileItem[];
@@ -55,8 +55,8 @@ const UserSchema = new Schema<UserDocument>(
 
     // ⭐⭐⭐ Profile sections as arrays
     profile: {
-      social: { type: [ProfileItemSchema], default: [] },
       contact: { type: [ProfileItemSchema], default: [] },
+      social: { type: [ProfileItemSchema], default: [] },
       payment: { type: [ProfileItemSchema], default: [] },
       video: { type: [ProfileItemSchema], default: [] },
       music: { type: [ProfileItemSchema], default: [] },
@@ -75,7 +75,7 @@ UserSchema.methods.toJSON = function () {
   const user = this.toObject();
   delete user.passwordHash;
 
-  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+  const sections = ["contact","social","payment", "video", "music", "design", "gaming", "other"];
 
   if (user.profile) {
     sections.forEach((sec) => {
@@ -98,8 +98,8 @@ UserSchema.methods.toJSON = function () {
     });
   } else {
     user.profile = {
-      social: {},
       contact: {},
+      social: {},
       payment: {},
       video: {},
       music: {},

@@ -25,7 +25,7 @@ const generateToken = (user: any) => {
 ----------------------------------------*/
 function formatProfileFromDoc(userDoc: any) {
   const formatted: any = {};
-  const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+  const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
 
   sections.forEach((section) => {
     const arr = userDoc?.profile?.[section];
@@ -159,8 +159,8 @@ export const createAdminIfNotExists = async (req: Request, res: Response) => {
       isAdmin: true,
       avatar: "",
       profile: {
-        social: [],
         contact: [],
+        social: [],
         payment: [],
         video: [],
         music: [],
@@ -231,7 +231,7 @@ export const updateProfile = async (req: any, res: Response) => {
     if (data.profile && typeof data.profile === "object") {
       if (!user.profile) user.profile = {} as any;
 
-      const sections = ["social", "contact", "payment", "video", "music", "design", "gaming", "other"];
+      const sections = ["contact","social","payment", "video", "music", "design", "gaming", "other"];
 
       for (const section of sections) {
         const incomingObj = data.profile[section];

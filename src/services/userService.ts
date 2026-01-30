@@ -19,8 +19,8 @@ export interface CreateUserInput {
   isAdmin?: boolean;
 
   profile?: {
-    social?: { key: string; value: string }[];
     contact?: { key: string; value: string }[];
+    social?: { key: string; value: string }[];
     payment?: { key: string; value: string }[];
     video?: { key: string; value: string }[];
     music?: { key: string; value: string }[];
@@ -36,8 +36,8 @@ export interface CreateUserInput {
  * ================================
  */
 const defaultProfile = {
-  social: [],
   contact: [],
+  social: [],
   payment: [],
   video: [],
   music: [],
