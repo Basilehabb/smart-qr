@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User";
+import { createUserService } from "../services/userService";
 
 /*----------------------------------------
   TOKEN GENERATOR
@@ -61,24 +62,14 @@ export const register = async (req: Request, res: Response) => {
 
     const hashed = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    const user = await createUserService({
       name,
       email,
-      passwordHash: hashed,
-      phone: phone || "",
-      job: job || "",
-      avatar: avatar || "",
-      isAdmin: false,
-      profile: {
-        social: [],
-        contact: [],
-        payment: [],
-        video: [],
-        music: [],
-        design: [],
-        gaming: [],
-        other: []
-      }
+      password,
+      phone,
+      job,
+      avatar,
+      isAdmin: false
     });
 
     const token = generateToken(user);

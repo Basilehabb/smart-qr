@@ -5,6 +5,7 @@ import ScanLog from "../models/ScanLog";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import * as XLSX from "xlsx";
+import { createUserService } from "../services/userService";
 
 /* ======================================================
    HELPER: Format Profile (Array → Object)
@@ -84,23 +85,13 @@ export const bulkUploadUsers = async (req: Request, res: Response) => {
         const password = row.password || crypto.randomBytes(4).toString("hex");
         const passwordHash = await bcrypt.hash(password, 10);
 
-        const user = await User.create({
+        const user = await createUserService({
           name: row.name,
           email: row.email,
-          phone: row.phone || "",
-          job: row.job || "",
-          avatar: row.avatar || "",
-          passwordHash,
-          profile: {
-            social: [],
-            contact: [],
-            payment: [],
-            video: [],
-            music: [],
-            design: [],
-            gaming: [],
-            other: []
-          }
+          password,
+          phone: row.phone,
+          job: row.job,
+          avatar: row.avatar
         });
 
         let qr: any;
@@ -366,22 +357,13 @@ export const createUser = async (req: Request, res: Response) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    const user = await createUserService({
       name,
       email,
-      phone: phone || "",
-      job: job || "",
-      passwordHash,
-      profile: {
-        social: [],
-        contact: [],
-        payment: [],
-        video: [],
-        music: [],
-        design: [],
-        gaming: [],
-        other: []
-      }
+      password,
+      phone,
+      job,
+      isAdmin: true
     });
 
     const userObj: any = user.toObject();
