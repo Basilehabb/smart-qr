@@ -742,6 +742,9 @@ export const uploadUserAvatarAdmin = async (req: any, res: Response) => {
    14) BULK UPLOAD USER AVATARS (ADMIN)
 ====================================================== */
 export const bulkUploadUserAvatars = async (req: any, res: Response) => {
+  console.log("🔥 bulkUploadUserAvatars HIT");
+  console.log("files:", req.files);
+  console.log("headers:", req.headers["content-type"]);
   try {
     if (!req.files || !req.files.length) {
       return res.status(400).json({ message: "No files uploaded" });

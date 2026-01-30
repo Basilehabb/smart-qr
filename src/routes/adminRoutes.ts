@@ -36,6 +36,8 @@ router.post("/users/bulk-upload", upload.single("file"), bulkUploadUsers);
 router.get("/users/template", downloadTemplate); 
 router.post(
   "/users/bulk-upload-avatars",
+  verifyToken as any,
+  verifyAdmin as any,
   uploadMultiple.array("files"),
   bulkUploadUserAvatars
 ); 
