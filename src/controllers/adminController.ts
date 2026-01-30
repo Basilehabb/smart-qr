@@ -738,3 +738,66 @@ export const uploadUserAvatarAdmin = async (req: any, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+/* ======================================================
+   14) BULK UPLOAD USER AVATARS (ADMIN)
+====================================================== */
+export const bulkUploadUserAvatars = async (req: any, res: Response) => {
+  try {
+    if (!req.files || !req.files.length) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    const results = {
+      success: [] as any[],
+      failed: [] as any[],
+    };
+
+    for (const file of req.files) {
+      const originalName = file.originalname;
+      const email = originalName.split(".")[0]; // email.jpg
+
+      const user = await User.findOne({ email });
+      if (!user) {
+        results.failed.push({
+          file: originalName,
+          error: "User not found",
+        });
+        continue;
+      }
+
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder: "avatars", resource_type: "image" },
+        async (error, result) => {
+          if (error || !result) {
+            results.failed.push({
+              file: originalName,
+              error: "Upload failed",
+            });
+            return;
+          }
+
+          user.avatar = result.secure_url;
+          (user as any).avatarPublicId = result.public_id;
+          await user.save();
+
+          results.success.push({
+            email,
+            avatar: result.secure_url,
+          });
+        }
+      );
+
+      streamifier.createReadStream(file.buffer).pipe(uploadStream);
+    }
+
+    return res.json({
+      message: "Bulk avatar upload finished",
+      results,
+    });
+
+  } catch (err) {
+    console.error("bulkUploadUserAvatars error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+

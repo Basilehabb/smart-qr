@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware";
 import { upload } from "../middleware/upload";
+import { uploadMultiple } from "../middleware/upload";
 
 import {
   bulkUploadUsers,
+  bulkUploadUserAvatars,
   getOverview,
   listUsers,
   createUser,
@@ -40,6 +42,11 @@ router.post(
   "/users/:userId/avatar",
   upload.single("file"),
   uploadUserAvatarAdmin
+);
+router.post(
+  "/users/bulk-upload-avatars",
+  uploadMultiple.array("files"),
+  bulkUploadUserAvatars
 );
 
 
