@@ -137,8 +137,11 @@ export const bulkUploadUsers = async (req: Request, res: Response) => {
           continue;
         }
 
-        const password = row.password || crypto.randomBytes(4).toString("hex");
-        const passwordHash = await bcrypt.hash(password, 10);
+        const password =
+          row.password !== undefined && row.password !== null
+            ? String(row.password)
+            : crypto.randomBytes(4).toString("hex");
+          const passwordHash = await bcrypt.hash(password, 10);
 
         const user = await createUserService({
           name: row.name,
