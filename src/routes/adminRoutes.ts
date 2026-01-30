@@ -36,17 +36,9 @@ router.post("/users/bulk-upload", upload.single("file"), bulkUploadUsers);
 router.get("/users/template", downloadTemplate); 
 router.post(
   "/users/bulk-upload-avatars",
-  (req, _res, next) => {
-    console.log("🔥 BEFORE MULTER");
-    next();
-  },
   uploadMultiple.array("files"),
-  (req, _res, next) => {
-    console.log("🔥 AFTER MULTER", req.files);
-    next();
-  },
   bulkUploadUserAvatars
-);
+); 
 router.post(
   "/users/:userId/avatar",
   upload.single("file"),
