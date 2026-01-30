@@ -31,6 +31,19 @@ const router = Router();
 router.use(verifyToken as any, verifyAdmin as any);
 router.get("/overview", getOverview);
 
+// Bulk upload
+router.post("/users/bulk-upload", upload.single("file"), bulkUploadUsers);
+router.get("/users/template", downloadTemplate); 
+router.post(
+  "/users/bulk-upload-avatars",
+  uploadMultiple.array("files"),
+  bulkUploadUserAvatars
+); 
+router.post(
+  "/users/:userId/avatar",
+  upload.single("file"),
+  uploadUserAvatarAdmin
+);
 
 // Users
 router.get("/users", listUsers);
@@ -38,16 +51,7 @@ router.post("/users", createUser);
 router.put("/users/:userId", updateUserProfileAdmin);
 router.delete("/users/:userId", deleteUser);
 router.post("/users/:userId/reset-password", resetPassword);
-router.post(
-  "/users/:userId/avatar",
-  upload.single("file"),
-  uploadUserAvatarAdmin
-);
-router.post(
-  "/users/bulk-upload-avatars",
-  uploadMultiple.array("files"),
-  bulkUploadUserAvatars
-);
+
 
 
 
@@ -68,6 +72,3 @@ router.get("/scan-analytics", scanAnalytics);
 
 export default router;
 
-// Bulk upload
-router.post("/users/bulk-upload", upload.single("file"), bulkUploadUsers);
-router.get("/users/template", downloadTemplate);
