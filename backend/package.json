@@ -1,0 +1,39 @@
+{
+  "name": "smart-qr-backend",
+  "version": "0.1.0",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "migrate:mongo-to-postgres": "ts-node --transpile-only src/scripts/migrateMongoToPostgres.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongodb": "^6.16.0",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^4.0.0",
+    "pg": "^8.13.1",
+    "streamifier": "^0.1.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.17",
+    "@types/jsonwebtoken": "^9.0.2",
+    "@types/multer": "^1.4.7",
+    "@types/node": "^20.5.1",
+    "@types/pg": "^8.11.10",
+    "ts-node-dev": "^2.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}
