@@ -36,6 +36,13 @@ const EMPTY_PROFILE: ProfileSections = {
 };
 
 export default function EditProfilePage() {
+  function redirectToLogin() {
+    const returnUrl = `${window.location.pathname}${window.location.search}`;
+    localStorage.removeItem("user-token");
+    localStorage.setItem("return-url", returnUrl);
+    window.location.href = "/login";
+  }
+
   // basic user info
   const [user, setUser] = useState<any | null>(null);
   const [name, setName] = useState("");
@@ -96,7 +103,7 @@ export default function EditProfilePage() {
         // fetch current user
         const token = localStorage.getItem("user-token");
         if (!token) {
-          window.location.href = "/login";
+          redirectToLogin();
           return;
         }
         const res = await api.get("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
@@ -141,6 +148,11 @@ export default function EditProfilePage() {
         if (u.avatar) setAvatarPreview(u.avatar);
       } catch (err) {
         console.error(err);
+        const status = (err as any)?.response?.status;
+        if (status === 401) {
+          redirectToLogin();
+          return;
+        }
         setError("Failed to load data");
       } finally {
         setLoading(false);
@@ -354,7 +366,7 @@ async function saveProfile() {
 
   try {
     const token = localStorage.getItem("user-token");
-    if (!token) return (window.location.href = "/login");
+    if (!token) return redirectToLogin();
 
     const avatarUrl = await uploadAvatarToServer();
 
@@ -407,6 +419,10 @@ async function saveProfile() {
 
   } catch (err: any) {
     console.error(err);
+    if (err?.response?.status === 401) {
+      redirectToLogin();
+      return;
+    }
     setError(err?.response?.data?.message || "Failed to save");
   } finally {
     setSaving(false);
