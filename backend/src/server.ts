@@ -14,15 +14,19 @@ import authRoutes from "./routes/authRoutes"; // ⬅ مهم جداً
 dotenv.config();
 const app = express();
 
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (!allowedOrigins.includes("http://localhost:3000")) {
+  allowedOrigins.push("http://localhost:3000");
+}
+
 // =====================================
 // ✅ MANUAL CORS HEADERS
 // =====================================
 app.use((req, res, next) => {
-  const allowedOrigins = [
-    "https://loly-for-accessories.vercel.app",
-    "http://localhost:3000"
-  ];
-
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -41,10 +45,7 @@ app.use((req, res, next) => {
 // =====================================
 app.use(
   cors({
-    origin: [
-      "https://loly-for-accessories.vercel.app",
-      "http://localhost:3000",
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -68,7 +69,6 @@ app.use("/api/fields", fieldsRoutes);
 
 // ✔️ رفع الملفات (لو ليك مسارات رفع أخرى غير avatar)
 app.use("/api/upload", uploadRoutes);
-app.use("/api/auth", authRoutes);         // ← لليوجينات
 
 
 // ❌ احذف السطر ده نهائيًا
