@@ -624,14 +624,22 @@ exports.updateUserProfileAdmin = updateUserProfileAdmin;
 ====================================================== */
 const deleteUser = async (req, res) => {
     try {
-        await User_1.default.findByIdAndDelete(req.params.userId);
-        await QRCode_1.default.updateMany({ userId: req.params.userId }, { userId: null });
-        res.json({ message: "User deleted" });
+      const user = await User.findById(req.params.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+  
+      // ✅ امسح الصورة من Cloudinary لو موجودة
+      if (user.avatarPublicId) {
+        await cloudinary.uploader.destroy(user.avatarPublicId);
+      }
+  
+      await User.findByIdAndDelete(req.params.userId);
+      await QRCode.updateMany({ userId: req.params.userId }, { userId: null });
+  
+      res.json({ message: "User deleted" });
+    } catch {
+      res.status(500).json({ message: "Server error" });
     }
-    catch {
-        res.status(500).json({ message: "Server error" });
-    }
-};
+  };
 exports.deleteUser = deleteUser;
 /* ======================================================
    10) QR MANAGEMENT
@@ -767,6 +775,10 @@ const bulkUploadUserAvatars = async (req, res) => {
                     });
                     return resolve();
                 }
+                    // ✅ امسح القديمة قبل الرفع
+                        if (user.avatarPublicId) {
+                            await cloudinary.uploader.destroy(user.avatarPublicId);
+                        }
                 const uploadStream = cloudinary_1.default.uploader.upload_stream({ folder: "avatars", resource_type: "image" }, async (error, result) => {
                     if (error || !result) {
                         results.failed.push({

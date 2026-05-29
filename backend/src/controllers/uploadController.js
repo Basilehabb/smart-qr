@@ -12,11 +12,17 @@ const uploadAvatar = async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ message: "No file uploaded" });
         }
-        const userId = req.user.id; // ✅ جاي من verifyToken
+        const userId = req.user.id;
         const user = await User_1.default.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+
+        // ✅ امسح الصورة القديمة من Cloudinary لو موجودة
+        if (user.avatarPublicId) {
+            await cloudinary_1.default.uploader.destroy(user.avatarPublicId);
+        }
+
         const uploadStream = cloudinary_1.default.uploader.upload_stream({
             folder: "avatars",
             resource_type: "image",
@@ -30,8 +36,8 @@ const uploadAvatar = async (req, res) => {
                     .status(500)
                     .json({ message: "Could not determine uploaded file URL" });
             }
-            // ⭐⭐ السطرين اللي كانوا ناقصين ⭐⭐
             user.avatar = result.secure_url;
+            user.avatarPublicId = result.public_id; // ✅ خزن الـ public_id للمرة الجاية
             await user.save();
             return res.json({
                 message: "Avatar uploaded and saved",
