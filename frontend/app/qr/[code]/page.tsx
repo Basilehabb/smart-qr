@@ -163,7 +163,7 @@ export default async function Page({ params }: Props) {
                 y="0"
                 width="375"
                 height="320"
-                preserveAspectRatio="xMidYMid slice"
+                preserveAspectRatio="xMidYMid meet"
                 mask="url(#curveMask)"
               />
             )}
@@ -180,30 +180,11 @@ export default async function Page({ params }: Props) {
             />
           </svg>
 
-          {/* LOGO - فوق الصورة والـ curve */}
-          <div className="absolute bottom-[-70px] left-1/2 -translate-x-1/2 z-30">
-            <div className="
-              w-36 h-36
-              rounded-full
-              bg-white
-              shadow-2xl
-              ring-[6px] ring-[#C9A441]
-              flex items-center justify-center
-              overflow-hidden
-              p-1
-            ">
-              <img
-                src="/loly-logo.png"
-                alt="Loly Accessories"
-                className="w-full h-full object-cover scale-[2]"
-              />
-            </div>
-          </div>
         </div>
 
 
         {/* ================= CONTENT ================= */}
-        <div className="px-6 pt-20 pb-8">
+        <div className="px-6 pt-8 pb-8">
 
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">
@@ -229,9 +210,14 @@ export default async function Page({ params }: Props) {
             <EditButton />
           </div>
 
-          <p className="text-xs text-gray-400 text-center mt-4">
-            Powered by Loly Accessories
-          </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+            <span>Powered by</span>
+            <img
+              src="/loly-logo.png"
+              alt="Loly Accessories"
+              className="h-5 w-auto object-contain"
+            />
+          </div>
         </div>
       </div>
     </main>
