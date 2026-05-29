@@ -8,6 +8,7 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
 const userService_1 = require("../services/userService");
+const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 /*----------------------------------------
   TOKEN GENERATOR
 ----------------------------------------*/
@@ -17,6 +18,17 @@ const generateToken = (user) => {
         isAdmin: user.isAdmin,
         email: user.email
     }, process.env.JWT_SECRET, { expiresIn: "7d" });
+};
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
+const buildInternalEmail = (phone) => `${normalizePhone(phone)}@${INTERNAL_EMAIL_DOMAIN}`;
+const isInternalEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
+const publicEmail = (email) => (isInternalEmail(email) ? "" : String(email || ""));
+const serializeUser = (userDoc) => {
+    const userObj = userDoc.toObject();
+    userObj.profile = formatProfileFromDoc(userDoc);
+    delete userObj.passwordHash;
+    userObj.email = publicEmail(userObj.email);
+    return userObj;
 };
 /*----------------------------------------
   ⭐ PROFILE FORMATTER (array → object)
@@ -47,23 +59,30 @@ function formatProfileFromDoc(userDoc) {
 const register = async (req, res) => {
     try {
         const { name, email, password, phone, job, avatar } = req.body;
-        const existing = await User_1.default.findOne({ email });
-        if (existing)
+        const normalizedPhone = normalizePhone(phone);
+        if (!name || !password || !normalizedPhone) {
+            return res.status(400).json({ message: "Name, phone, and password are required" });
+        }
+        const existingByPhone = await User_1.default.findOne({ phone: normalizedPhone });
+        if (existingByPhone)
             return res.status(400).json({ message: "User already exists" });
-        const hashed = await bcryptjs_1.default.hash(password, 10);
+        const trimmedEmail = String(email || "").trim();
+        if (trimmedEmail) {
+            const existingByEmail = await User_1.default.findOne({ email: trimmedEmail });
+            if (existingByEmail)
+                return res.status(400).json({ message: "Email already exists" });
+        }
         const user = await (0, userService_1.createUserService)({
             name,
-            email,
+            email: trimmedEmail || buildInternalEmail(normalizedPhone),
             password,
-            phone,
+            phone: normalizedPhone,
             job,
             avatar,
             isAdmin: false
         });
         const token = generateToken(user);
-        const userObj = user.toObject();
-        userObj.profile = formatProfileFromDoc(user);
-        delete userObj.passwordHash;
+        const userObj = serializeUser(user);
         return res.status(201).json({
             message: "User registered",
             token,
@@ -90,17 +109,21 @@ exports.register = register;
 ----------------------------------------*/
 const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const user = await User_1.default.findOne({ email });
+        const { phone, email, password } = req.body;
+        const rawIdentifier = String(phone || email || "").trim();
+        if (!rawIdentifier || !password) {
+            return res.status(400).json({ message: "Phone and password are required" });
+        }
+        const user = rawIdentifier.includes("@")
+            ? await User_1.default.findOne({ email: rawIdentifier })
+            : await User_1.default.findOne({ phone: normalizePhone(rawIdentifier) });
         if (!user)
             return res.status(404).json({ message: "User not found" });
         const isMatch = await bcryptjs_1.default.compare(password, user.passwordHash || "");
         if (!isMatch)
             return res.status(400).json({ message: "Invalid credentials" });
         const token = generateToken(user);
-        const userObj = user.toObject();
-        userObj.profile = formatProfileFromDoc(user);
-        delete userObj.passwordHash;
+        const userObj = serializeUser(user);
         res.json({
             message: "Login successful",
             token,
@@ -108,6 +131,7 @@ const login = async (req, res) => {
                 id: userObj._id,
                 name: userObj.name,
                 email: userObj.email,
+                phone: userObj.phone,
                 avatar: userObj.avatar,
                 isAdmin: userObj.isAdmin,
                 profile: userObj.profile
@@ -167,9 +191,7 @@ const getMe = async (req, res) => {
         const user = await User_1.default.findById(req.user.id);
         if (!user)
             return res.status(404).json({ message: "User not found" });
-        const userObj = user.toObject();
-        userObj.profile = formatProfileFromDoc(user);
-        delete userObj.passwordHash;
+        const userObj = serializeUser(user);
         res.json({ user: userObj });
     }
     catch (error) {
@@ -188,13 +210,44 @@ const updateProfile = async (req, res) => {
         const user = await User_1.default.findById(userId);
         if (!user)
             return res.status(404).json({ message: "User not found" });
+        const nextPhone = data.phone !== undefined ? normalizePhone(data.phone) : user.phone;
+        if (data.phone !== undefined && !nextPhone) {
+            return res.status(400).json({ message: "Phone is required" });
+        }
+        if (data.phone !== undefined && nextPhone !== user.phone) {
+            const phoneOwner = await User_1.default.findOne({ phone: nextPhone });
+            if (phoneOwner && phoneOwner._id !== user._id) {
+                return res.status(409).json({ message: "Phone already exists" });
+            }
+        }
+        if (data.email !== undefined) {
+            const trimmedEmail = String(data.email || "").trim();
+            if (trimmedEmail) {
+                const emailOwner = await User_1.default.findOne({ email: trimmedEmail });
+                if (emailOwner && emailOwner._id !== user._id) {
+                    return res.status(409).json({ message: "Email already exists" });
+                }
+            }
+        }
         // Update basic fields
         const allowed = ["name", "email", "phone", "job", "avatar", "countryCode"];
         allowed.forEach((key) => {
             if (data[key] !== undefined) {
+                if (key === "phone") {
+                    user.phone = nextPhone;
+                    return;
+                }
+                if (key === "email") {
+                    const trimmedEmail = String(data.email || "").trim();
+                    user.email = trimmedEmail || buildInternalEmail(nextPhone || user.phone);
+                    return;
+                }
                 user[key] = data[key];
             }
         });
+        if (data.phone !== undefined && data.email === undefined && isInternalEmail(user.email)) {
+            user.email = buildInternalEmail(nextPhone || user.phone);
+        }
         // Update password
         if (data.password) {
             const hashed = await bcryptjs_1.default.hash(data.password, 10);
@@ -228,9 +281,7 @@ const updateProfile = async (req, res) => {
         }
         await user.save();
         // Return formatted response
-        const userObj = user.toObject();
-        userObj.profile = formatProfileFromDoc(user);
-        delete userObj.passwordHash;
+        const userObj = serializeUser(user);
         return res.json({ message: "Profile updated", user: userObj });
     }
     catch (err) {

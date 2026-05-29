@@ -4,13 +4,13 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
 
   const login = async () => {
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api.post("/auth/login", { phone, password });
       const token = res.data.token;
       const user = res.data.user;
 
@@ -84,9 +84,9 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
       <input
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        placeholder="Phone number"
       />
 
       <input

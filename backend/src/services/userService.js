@@ -28,18 +28,29 @@ const defaultProfile = {
  */
 const createUserService = async (data) => {
     const { name, email, password, phone = "", countryCode = "+20", job = "", avatar = "", isAdmin = false, profile } = data;
-    // 1️⃣ Check email uniqueness
-    const existing = await User_1.default.findOne({ email });
-    if (existing) {
-        throw new Error("EMAIL_EXISTS");
+    const normalizedEmail = String(email || "").trim();
+    const normalizedPhone = String(phone || "").replace(/\D/g, "");
+    // 1️⃣ Check phone uniqueness
+    if (normalizedPhone) {
+        const existingByPhone = await User_1.default.findOne({ phone: normalizedPhone });
+        if (existingByPhone) {
+            throw new Error("PHONE_EXISTS");
+        }
     }
-    // 2️⃣ Hash password
+    // 2️⃣ Check email uniqueness
+    if (normalizedEmail) {
+        const existing = await User_1.default.findOne({ email: normalizedEmail });
+        if (existing) {
+            throw new Error("EMAIL_EXISTS");
+        }
+    }
+    // 3️⃣ Hash password
     const passwordHash = await bcryptjs_1.default.hash(password, 10);
-    // 3️⃣ Create user
+    // 4️⃣ Create user
     const user = await User_1.default.create({
         name,
-        email,
-        phone,
+        email: normalizedEmail,
+        phone: normalizedPhone,
         countryCode,
         job,
         avatar,

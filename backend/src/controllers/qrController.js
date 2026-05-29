@@ -7,6 +7,7 @@ exports.linkExistingQRToUser = exports.createQRForUser = exports.createQR = expo
 const QRCode_1 = __importDefault(require("../models/QRCode"));
 const ScanLog_1 = __importDefault(require("../models/ScanLog"));
 const nanoid_1 = require("nanoid");
+const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 /*----------------------------------------
   ⭐ PROFILE FORMATTER (array → object)
 ----------------------------------------*/
@@ -32,6 +33,7 @@ function formatProfile(user) {
     });
     return out;
 }
+const publicEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`) ? "" : String(email || "");
 /*----------------------------------------
   PUBLIC — QR Scan
 ----------------------------------------*/
@@ -60,7 +62,7 @@ const getQRDetails = async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                email: user.email,
+                email: publicEmail(user.email),
                 phone: user.phone,
                 countryCode: user.countryCode || "",
                 job: user.job || "",

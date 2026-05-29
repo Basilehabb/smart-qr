@@ -116,7 +116,7 @@ function RegisterForm() {
 
       /* 2️⃣ LOGIN (حتى في admin) */
       const loginRes = await axios.post(`${API}/auth/login`, {
-        email: formData.email,
+        phone: formData.phone,
         password: formData.password,
       });
 
@@ -188,17 +188,25 @@ function RegisterForm() {
 
           {/* BASIC */}
           <div className="grid grid-cols-2 gap-4">
-            {["name", "email", "password", "phone", "job"].map((k) => (
+            {["name", "phone", "password", "job"].map((k) => (
               <input
                 key={k}
                 type={k === "password" ? "password" : "text"}
-                placeholder={k}
+                placeholder={
+                  k === "name"
+                    ? "Full name"
+                    : k === "phone"
+                    ? "Phone number"
+                    : k === "password"
+                    ? "Password"
+                    : "Job title"
+                }
                 value={(formData as any)[k]}
                 onChange={(e) =>
                   setFormData({ ...formData, [k]: e.target.value })
                 }
                 className="border rounded-lg px-4 py-3"
-                required={k !== "phone" && k !== "job"}
+                required={k !== "job"}
               />
             ))}
           </div>
