@@ -174,7 +174,7 @@ export default function AdminUsersPage() {
                 <thead>
                   <tr className="border-b text-sm text-gray-600">
                     <th className="p-3">Name</th>
-                    <th>Email</th>
+                    <th>Phone</th>
                     <th>QRs</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
@@ -187,7 +187,7 @@ export default function AdminUsersPage() {
                       className="border-b hover:bg-gray-50 text-sm"
                     >
                       <td className="p-3">{user.name}</td>
-                      <td>{user.email}</td>
+                      <td>{user.phone || user.email || "-"}</td>
 
                       <td>{user.qrCount ?? 0}</td>
 
@@ -277,8 +277,8 @@ export default function AdminUsersPage() {
                 <option value="oldest">Oldest</option>
                 <option value="name_asc">Name A-Z</option>
                 <option value="name_desc">Name Z-A</option>
-                <option value="email_asc">Email A-Z</option>
-                <option value="email_desc">Email Z-A</option>
+                <option value="email_asc">Phone A-Z</option>
+                <option value="email_desc">Phone Z-A</option>
               </select>
             </div>
 

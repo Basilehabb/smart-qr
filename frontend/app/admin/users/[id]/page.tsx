@@ -198,7 +198,7 @@ export default function UserDetailsPage() {
   }
 
   function isEmail(v: string) {
-    return /\S+@\S+\.\S+/.test(v);
+    return !v.trim() || /\S+@\S+\.\S+/.test(v);
   }
 
   function isUrl(v: string) {
@@ -467,8 +467,8 @@ export default function UserDetailsPage() {
             {!isEditing ? (
               <>
                 <p><b>Name:</b> {user.name}</p>
-                <p><b>Email:</b> {user.email}</p>
-                {user.phone && <p><b>Phone:</b> {user.phone}</p>}
+                {user.email && <p><b>Public Email:</b> {user.email}</p>}
+                {user.phone && <p><b>Login Phone:</b> {user.phone}</p>}
                 {user.job && <p><b>Job:</b> {user.job}</p>}
 
                 <button className="mt-3 px-4 py-2 bg-purple-600 text-white rounded" onClick={resetPassword}>
@@ -491,21 +491,20 @@ export default function UserDetailsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm mb-1">Email</label>
+                  <label className="block text-sm mb-1">Public Email</label>
                   <input
                     className="border px-3 py-2 rounded w-full"
                     value={editData.email}
                     onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                    placeholder="Optional"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm mb-1">Phone</label>
-                  <input
-                    className="border px-3 py-2 rounded w-full"
-                    value={editData.phone}
-                    onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                  />
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-1">Login Phone</label>
+                  <div className="border px-3 py-2 rounded w-full bg-gray-50 text-gray-700">
+                    {editData.phone || "-"}
+                  </div>
                 </div>
 
                 <div>

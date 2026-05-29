@@ -375,12 +375,10 @@ async function saveProfile() {
       cleanProfile[section] = { ...profile[section] };
     }
 
-    const payload: any = {
+const payload: any = {
       name,
       email,
       job,
-      phone,
-      countryCode,
       profile: cleanProfile,
     };
 
@@ -456,7 +454,6 @@ async function saveProfile() {
             <div className="mt-4 text-center">
               <h3 className="text-xl font-semibold">{name || "No name"}</h3>
               {email ? <p className="text-sm text-gray-500">{email}</p> : null}
-              <p className="text-sm text-gray-500">{countryCode} {phone}</p>
             </div>
 
             <div className="mt-6 space-y-3">
@@ -503,8 +500,8 @@ async function saveProfile() {
           <div className="bg-white rounded-xl shadow p-6 space-y-4">
             {/* Basic Info Section */}
             <div className="space-y-4">
-              {/* Row 1 — Name + Email + Phone */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Row 1 — Name + Email */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Name */}
                 <input
                   className="border rounded px-3 py-2 w-full"
@@ -521,38 +518,6 @@ async function saveProfile() {
                   placeholder="Email (optional)"
                 />
 
-                {/* Phone (with country code box) */}
-                <div className="flex items-center w-full">
-                  <div
-                    className="
-                        flex items-center
-                        border border-gray-300
-                        bg-gray-50
-                        rounded-l-lg
-                        px-2
-                        h-[42px]
-                        text-sm text-gray-700
-                      "
-                  >
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="bg-transparent outline-none cursor-pointer text-sm"
-                    >
-                      <option value="+20">+20</option>
-                      <option value="+971">+971</option>
-                      <option value="+966">+966</option>
-                      <option value="+1">+1</option>
-                    </select>
-                  </div>
-
-                  <input
-                    className="border border-gray-300 border-l-0 rounded-r-lg px-3 h-[42px] w-full text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Phone number"
-                  />
-                </div>
               </div>
 
               {/* Row 2 — Job + Password + Avatar */}

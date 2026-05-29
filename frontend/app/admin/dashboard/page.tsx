@@ -92,7 +92,7 @@ export default function AdminDashboard() {
               <ul>
                 {latestUsers.map((u) => (
                   <li key={u._id} className="py-2 border-b last:border-none">
-                    {u.name} – {u.email}
+                    {u.name} – {u.phone || u.email || "-"}
                   </li>
                 ))}
               </ul>

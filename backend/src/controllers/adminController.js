@@ -44,6 +44,7 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const crypto_1 = __importDefault(require("crypto"));
 const XLSX = __importStar(require("xlsx"));
 const userService_1 = require("../services/userService");
+const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 /* =====================
    LINK NORMALIZER (USED IN BULK UPLOAD)
 ===================== */
@@ -106,6 +107,18 @@ function formatProfile(userDoc) {
     });
     return formatted;
 }
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
+const buildInternalEmail = (phone) => `${normalizePhone(phone)}@${INTERNAL_EMAIL_DOMAIN}`;
+const isInternalEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
+const publicEmail = (email) => isInternalEmail(email) ? "" : String(email || "");
+const serializeAdminUser = (userDoc) => {
+    const userObj = typeof userDoc?.toObject === "function" ? userDoc.toObject() : { ...userDoc };
+    userObj.profile = formatProfile(userDoc);
+    userObj.email = publicEmail(userObj.email);
+    userObj.loginPhone = userObj.phone || "";
+    delete userObj.passwordHash;
+    return userObj;
+};
 /* ======================================================
    1) BULK UPLOAD USERS
 ====================================================== */
@@ -385,9 +398,8 @@ const listUsers = async (req, res) => {
         // Enrich users with qrCount and format profile
         const enriched = users.map((u) => {
             const qrCount = qrs.filter((q) => q.userId && String(q.userId) === String(u._id)).length;
-            const out = { ...u };
+            const out = serializeAdminUser(u);
             out.qrCount = qrCount;
-            out.profile = formatProfile(u);
             return out;
         });
         // If hasQR filter true => keep only users with qrCount > 0
@@ -419,22 +431,21 @@ exports.listUsers = listUsers;
 const createUser = async (req, res) => {
     try {
         const { name, email, phone, job, password } = req.body;
-        if (!name || !email || !password)
+        if (!name || !phone || !password)
             return res.status(400).json({ message: "Missing fields" });
-        if (await User_1.default.findOne({ email }))
+        if (await User_1.default.findOne({ phone: normalizePhone(phone) }))
+            return res.status(409).json({ message: "Phone exists" });
+        if (email && await User_1.default.findOne({ email }))
             return res.status(409).json({ message: "Email exists" });
-        const passwordHash = await bcryptjs_1.default.hash(password, 10);
         const user = await (0, userService_1.createUserService)({
             name,
-            email,
+            email: String(email || "").trim() || buildInternalEmail(phone),
             password,
             phone,
             job,
             isAdmin: true
         });
-        const userObj = user.toObject();
-        userObj.profile = formatProfile(user);
-        delete userObj.passwordHash;
+        const userObj = serializeAdminUser(user);
         return res.json({ user: userObj });
     }
     catch (err) {
@@ -455,8 +466,7 @@ const getUser = async (req, res) => {
         // ⭐ Get all QR codes linked to this user
         const qrCodes = await QRCode_1.default.find({ userId }).select("code createdAt");
         // ⭐ Format profile correctly
-        const userObj = user.toObject();
-        userObj.profile = formatProfile(user);
+        const userObj = serializeAdminUser(user);
         // ⭐ Include linked QR codes in response
         userObj.qrCodes = qrCodes;
         return res.json({ user: userObj });
@@ -481,6 +491,15 @@ const updateUser = async (req, res) => {
         const editable = ["name", "email", "phone", "job", "avatar", "isAdmin"];
         editable.forEach((field) => {
             if (data[field] !== undefined) {
+                if (field === "phone") {
+                    user.phone = normalizePhone(data.phone);
+                    return;
+                }
+                if (field === "email") {
+                    const nextPhone = normalizePhone(data.phone !== undefined ? data.phone : user.phone);
+                    user.email = String(data.email || "").trim() || buildInternalEmail(nextPhone || user.phone);
+                    return;
+                }
                 user[field] = data[field];
             }
         });
@@ -488,9 +507,7 @@ const updateUser = async (req, res) => {
             user.passwordHash = await bcryptjs_1.default.hash(String(data.password), 10);
         }
         await user.save();
-        const userObj = user.toObject();
-        userObj.profile = formatProfile(user);
-        delete userObj.passwordHash;
+        const userObj = serializeAdminUser(user);
         return res.json({ user: userObj });
     }
     catch (err) {
@@ -513,8 +530,18 @@ const updateUserProfileAdmin = async (req, res) => {
         // Update basic fields
         const editable = ["name", "email", "phone", "job", "avatar", "countryCode", "isAdmin"];
         editable.forEach(k => {
-            if (data[k] !== undefined)
+            if (data[k] !== undefined) {
+                if (k === "phone") {
+                    user.phone = normalizePhone(data.phone);
+                    return;
+                }
+                if (k === "email") {
+                    const nextPhone = normalizePhone(data.phone !== undefined ? data.phone : user.phone);
+                    user.email = String(data.email || "").trim() || buildInternalEmail(nextPhone || user.phone);
+                    return;
+                }
                 user[k] = data[k];
+            }
         });
         if (data.password) {
             user.passwordHash = await bcryptjs_1.default.hash(String(data.password), 10);
@@ -537,9 +564,7 @@ const updateUserProfileAdmin = async (req, res) => {
             user.markModified("profile");
         }
         await user.save();
-        const userObj = user.toObject();
-        userObj.profile = formatProfile(user);
-        delete userObj.passwordHash;
+        const userObj = serializeAdminUser(user);
         return res.json({ user: userObj });
     }
     catch (err) {
@@ -566,8 +591,14 @@ exports.deleteUser = deleteUser;
    10) QR MANAGEMENT
 ====================================================== */
 const listQRs = async (req, res) => {
-    const qrs = await QRCode_1.default.find().populate("userId", "name email");
-    res.json(qrs);
+    const qrs = await QRCode_1.default.find().populate("userId", "name email phone");
+    res.json(qrs.map((qr) => {
+        const out = typeof qr?.toObject === "function" ? qr.toObject() : { ...qr };
+        if (out.userId) {
+            out.userId.email = publicEmail(out.userId.email);
+        }
+        return out;
+    }));
 };
 exports.listQRs = listQRs;
 const unlinkQR = async (req, res) => {

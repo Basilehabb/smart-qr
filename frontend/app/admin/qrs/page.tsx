@@ -169,7 +169,7 @@ export default function AdminQRsPage() {
                         {qr.userId ? (
                           <>
                             <span className="font-medium">{qr.userId.name}</span><br />
-                            <span className="text-gray-500 text-sm">{qr.userId.email}</span>
+                            <span className="text-gray-500 text-sm">{qr.userId.phone || qr.userId.email || "-"}</span>
                           </>
                         ) : (
                           <span className="text-gray-400">Not Linked</span>
