@@ -624,22 +624,23 @@ exports.updateUserProfileAdmin = updateUserProfileAdmin;
 ====================================================== */
 const deleteUser = async (req, res) => {
     try {
-      const user = await User.findById(req.params.userId);
-      if (!user) return res.status(404).json({ message: "User not found" });
-  
-      // ✅ امسح الصورة من Cloudinary لو موجودة
-      if (user.avatarPublicId) {
-        await cloudinary.uploader.destroy(user.avatarPublicId);
-      }
-  
-      await User.findByIdAndDelete(req.params.userId);
-      await QRCode.updateMany({ userId: req.params.userId }, { userId: null });
-  
-      res.json({ message: "User deleted" });
-    } catch {
-      res.status(500).json({ message: "Server error" });
+        const user = await User_1.default.findById(req.params.userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // ✅ امسح الصورة من Cloudinary
+        if (user.avatarPublicId) {
+            await cloudinary_1.default.uploader.destroy(user.avatarPublicId);
+        }
+
+        await User_1.default.findByIdAndDelete(req.params.userId);
+        await QRCode_1.default.updateMany({ userId: req.params.userId }, { userId: null });
+
+        res.json({ message: "User deleted" });
+    } catch (err) {
+        console.error("deleteUser error:", err);
+        res.status(500).json({ message: "Server error" });
     }
-  };
+};
 exports.deleteUser = deleteUser;
 /* ======================================================
    10) QR MANAGEMENT
@@ -777,7 +778,7 @@ const bulkUploadUserAvatars = async (req, res) => {
                 }
                     // ✅ امسح القديمة قبل الرفع
                         if (user.avatarPublicId) {
-                            await cloudinary.uploader.destroy(user.avatarPublicId);
+                            await cloudinary_1.default.uploader.destroy(user.avatarPublicId);
                         }
                 const uploadStream = cloudinary_1.default.uploader.upload_stream({ folder: "avatars", resource_type: "image" }, async (error, result) => {
                     if (error || !result) {
