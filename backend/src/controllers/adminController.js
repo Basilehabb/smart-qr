@@ -51,6 +51,7 @@ const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 function normalizeLink(type, value) {
     if (!value)
         return "";
+    const baseType = String(type || "").split("__")[0];
     const v = String(value).trim();
     if (v.startsWith("http://") ||
         v.startsWith("https://") ||
@@ -58,15 +59,23 @@ function normalizeLink(type, value) {
         v.startsWith("mailto:")) {
         return v;
     }
-    switch (type) {
+    switch (baseType) {
         case "facebook":
             return `https://www.facebook.com/${v.replace(/^@/, "")}/`;
         case "instagram":
             return `https://www.instagram.com/${v.replace(/^@/, "")}`;
+        case "x":
+            return `https://x.com/${v.replace(/^@/, "")}`;
+        case "threads":
+            return `https://www.threads.net/@${v.replace(/^@/, "")}`;
+        case "linkedin":
+            return `https://www.linkedin.com/in/${v.replace(/^@/, "")}`;
         case "tiktok":
             return `https://www.tiktok.com/@${v.replace(/^@/, "")}`;
         case "youtube":
             return `https://www.youtube.com/@${v.replace(/^@/, "")}`;
+        case "snapchat":
+            return `https://www.snapchat.com/add/${v.replace(/^@/, "")}`;
         case "whatsapp": {
             const num = v.replace(/\D/g, "").replace(/^0/, "20");
             return `https://wa.me/${num}`;
@@ -78,13 +87,30 @@ function normalizeLink(type, value) {
         case "email":
             return `mailto:${v}`;
         case "website":
+        case "other":
             return v.startsWith("http") ? v : `https://${v}`;
         case "paypal":
             return `https://paypal.me/${v}`;
+        case "instapay":
+            return v.includes("@") ? "https://www.instapay.eg/" : (v.startsWith("http") ? v : `https://${v}`);
         default:
             return v;
     }
 }
+const splitMultiValues = (value) => String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+const getNextProfileKey = (target, baseKey) => {
+    const count = Object.keys(target).filter((key) => key.split("__")[0] === baseKey).length;
+    return count === 0 ? baseKey : `${baseKey}__${count + 1}`;
+};
+const appendProfileValues = (target, baseKey, rawValue) => {
+    splitMultiValues(rawValue).forEach((item) => {
+        const key = getNextProfileKey(target, baseKey);
+        target[key] = normalizeLink(baseKey, item);
+    });
+};
 /* ======================================================
    HELPER: Format Profile (Array → Object)
 ====================================================== */
@@ -142,19 +168,20 @@ const bulkUploadUsers = async (req, res) => {
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
-                if (!row.name || !row.email) {
+                if (!row.name || !row.phone) {
                     results.errors.push({
                         row: i + 2,
-                        error: "Missing required fields (name, email)",
+                        error: "Missing required fields (name, phone)",
                         data: row
                     });
                     continue;
                 }
-                const existing = await User_1.default.findOne({ email: row.email });
+                const normalizedPhone = normalizePhone(row.phone);
+                const existing = await User_1.default.findOne({ phone: normalizedPhone });
                 if (existing) {
                     results.errors.push({
                         row: i + 2,
-                        error: "Email already exists",
+                        error: "Phone already exists",
                         data: row
                     });
                     continue;
@@ -178,32 +205,31 @@ const bulkUploadUsers = async (req, res) => {
                     social: {},
                     contact: {},
                     payment: {},
+                    video: {},
                     other: {}
                 };
-                if (row.instagram)
-                    profile.social.instagram = normalizeLink("instagram", row.instagram);
-                if (row.facebook)
-                    profile.social.facebook = normalizeLink("facebook", row.facebook);
-                if (row.tiktok)
-                    profile.social.tiktok = normalizeLink("tiktok", row.tiktok);
-                if (row.youtube)
-                    profile.social.youtube = normalizeLink("youtube", row.youtube);
-                if (row.whatsapp)
-                    profile.contact.whatsapp = normalizeLink("whatsapp", row.whatsapp);
-                if (row.publicEmail)
-                    profile.contact.email = normalizeLink("email", row.publicEmail);
-                if (row.phoneLink)
-                    profile.contact.phone = normalizeLink("phone", row.phoneLink);
-                if (row.paypal)
-                    profile.payment.paypal = normalizeLink("paypal", row.paypal);
-                if (row.website)
-                    profile.other.website = normalizeLink("website", row.website);
+                appendProfileValues(profile.social, "instagram", row.instagram);
+                appendProfileValues(profile.social, "facebook", row.facebook);
+                appendProfileValues(profile.social, "x", row.x);
+                appendProfileValues(profile.social, "threads", row.threads);
+                appendProfileValues(profile.social, "linkedin", row.linkedin);
+                appendProfileValues(profile.social, "tiktok", row.tiktok);
+                appendProfileValues(profile.social, "snapchat", row.snapchat);
+                appendProfileValues(profile.video, "youtube", row.youtube);
+                appendProfileValues(profile.contact, "whatsapp", row.whatsapp);
+                appendProfileValues(profile.contact, "email", row.publicEmail);
+                appendProfileValues(profile.contact, "phone", row.phoneLink);
+                appendProfileValues(profile.payment, "paypal", row.paypal);
+                appendProfileValues(profile.payment, "instapay", row.instapay);
+                appendProfileValues(profile.other, "website", row.website);
+                appendProfileValues(profile.other, "other", row.other);
                 if (Object.values(profile).some((sec) => Object.keys(sec).length > 0)) {
                     await User_1.default.findByIdAndUpdate(user._id, {
                         profile: {
                             social: Object.entries(profile.social).map(([k, v]) => ({ key: k, value: v })),
                             contact: Object.entries(profile.contact).map(([k, v]) => ({ key: k, value: v })),
                             payment: Object.entries(profile.payment).map(([k, v]) => ({ key: k, value: v })),
+                            video: Object.entries(profile.video).map(([k, v]) => ({ key: k, value: v })),
                             other: Object.entries(profile.other).map(([k, v]) => ({ key: k, value: v })),
                         }
                     });
@@ -237,7 +263,7 @@ const bulkUploadUsers = async (req, res) => {
                 }
                 results.success.push({
                     row: i + 2,
-                    user: { id: user._id, name: user.name, email: user.email, password },
+                    user: { id: user._id, name: user.name, email: publicEmail(user.email), phone: user.phone, password },
                     qrCode: qr.code
                 });
             }
@@ -273,15 +299,21 @@ const downloadTemplate = async (req, res) => {
                 job: "Engineer",
                 password: "",
                 qrCode: "",
-                instagram: "john_doe",
-                facebook: "john.doe",
+                instagram: "john_doe,john.doe.shop",
+                facebook: "john.doe,john.doe.page",
+                x: "johnx",
+                threads: "johnthreads",
+                linkedin: "john-doe",
                 tiktok: "",
-                youtube: "",
-                whatsapp: "01234567890",
-                publicEmail: "contact@example.com",
-                phoneLink: "01234567890",
+                youtube: "johnchannel,secondchannel",
+                snapchat: "johnsnap",
+                whatsapp: "01234567890,01022223333",
+                publicEmail: "contact@example.com,sales@example.com",
+                phoneLink: "01234567890,01022223333",
                 paypal: "",
-                website: "example.com"
+                instapay: "name@instapay",
+                website: "example.com,store.example.com",
+                other: "https://wuzzuf.net/,https://trello.com/"
             }
         ];
         const ws = XLSX.utils.json_to_sheet(template);

@@ -5,6 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import AdminSidebar from "../../AdminSidebar";
 import { ExternalLink } from "lucide-react";
+import {
+  PLATFORM_DEFINITIONS,
+  getBasePlatformId,
+  getNextPlatformKey,
+  getProfileEntryTitle,
+  normalizeLink,
+} from "@/lib/normalizeLink";
 
 type Platform = {
   id: string;
@@ -187,14 +194,7 @@ export default function UserDetailsPage() {
   }, [router, userId]);
 
   function fallbackPlatforms(): Platform[] {
-    return [
-      { id: "website", title: "Website", category: "other", requires: "url" },
-      { id: "whatsapp", title: "WhatsApp", category: "contact", requires: "phone", template: "https://wa.me/{PHONE}" },
-      { id: "instagram", title: "Instagram", category: "social", requires: "text", template: "https://instagram.com/{VALUE}" },
-      { id: "facebook", title: "Facebook", category: "social", requires: "url" },
-      { id: "tiktok", title: "TikTok", category: "social", requires: "text", template: "https://tiktok.com/@{VALUE}" },
-      { id: "phone", title: "Phone", category: "contact", requires: "phone" },
-    ];
+    return PLATFORM_DEFINITIONS as Platform[];
   }
 
   function isEmail(v: string) {
@@ -220,22 +220,7 @@ export default function UserDetailsPage() {
 
   function generateLink(platform: Platform, value: string) {
     if (!platform || !value) return value;
-    if (platform.template) {
-      return platform.template.replace("{PHONE}", digitsOnly(value)).replace("{VALUE}", encodeURIComponent(value));
-    }
-    if (platform.id === "whatsapp") {
-      let digits = digitsOnly(value);
-      return `https://wa.me/${digits}`;
-    }
-    if (platform.id === "instagram") {
-      const handle = value.replace(/^@/, "");
-      return `https://instagram.com/${handle}`;
-    }
-    if (platform.id === "website") {
-      if (/^https?:\/\//.test(value)) return value;
-      return `https://${value}`;
-    }
-    return value;
+    return normalizeLink(platform.id, value);
   }
 
   function addPlatformToProfile(platformId: string, rawValue: string) {
@@ -243,11 +228,12 @@ export default function UserDetailsPage() {
     if (!platform) return;
 
     const category = (platform.category || "other") as keyof ProfileSections;
-    const value = (platform.template || platform.requires) ? generateLink(platform, rawValue) : rawValue;
+    const entryKey = getNextPlatformKey(platform.id, (profile as any)[category] || {});
+    const value = generateLink(platform, rawValue);
 
     setProfile((prev) => ({
       ...prev,
-      [category]: { ...(prev as any)[category], [platformId]: value },
+      [category]: { ...(prev as any)[category], [entryKey]: value },
     }));
   }
 
@@ -328,8 +314,8 @@ export default function UserDetailsPage() {
     dragItem.current = null;
   }
 
-  function getPlatformTitle(id: string) {
-    return platforms.find((p) => p.id === id)?.title || id;
+  function getPlatformTitle(id: string, value?: string | null) {
+    return getProfileEntryTitle(id, String(value || ""));
   }
 
   const filteredPlatforms = platforms.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -344,7 +330,14 @@ export default function UserDetailsPage() {
     try {
       const cleanProfile: any = {};
       for (const section of Object.keys(profile) as (keyof ProfileSections)[]) {
-        cleanProfile[section] = { ...profile[section] };
+        cleanProfile[section] = {};
+        for (const [key, value] of Object.entries(profile[section])) {
+          if (value === null) {
+            cleanProfile[section][key] = null;
+            continue;
+          }
+          cleanProfile[section][key] = normalizeLink(getBasePlatformId(key), String(value));
+        }
       }
       if (avatarFile) {
         const fd = new FormData();
@@ -585,7 +578,7 @@ export default function UserDetailsPage() {
 
                   {(Object.entries(profile[activeTab] || {}) as [string, string | null][]).map(([plat, val]) => {
                     const platInfo = platforms.find((p) => p.id === plat);
-                    const title = platInfo?.title || plat;
+                    const title = getPlatformTitle(plat, String(val ?? ""));
                     const isPendingDelete = val === null;
 
                     return (

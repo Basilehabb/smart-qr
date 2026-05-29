@@ -55,19 +55,19 @@ export default function BulkUploadPage() {
   const downloadResults = () => {
     if (!results) return;
 
-    const successData = results.success.map((item: any) => ({
+      const successData = results.success.map((item: any) => ({
       Row: item.row,
       Name: item.user.name,
-      Email: item.user.email,
+      Phone: item.user.phone || item.user.email,
       Password: item.user.password,
       "QR Code": item.qrCode,
       Status: "Success",
     }));
 
-    const errorData = results.errors.map((item: any) => ({
+      const errorData = results.errors.map((item: any) => ({
       Row: item.row,
       Name: item.data.name,
-      Email: item.data.email,
+      Phone: item.data.phone,
       Error: item.error,
       Status: "Failed",
     }));
@@ -110,9 +110,10 @@ export default function BulkUploadPage() {
             <h3 className="font-semibold mb-2">📋 Instructions:</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm">
               <li>Download the Excel template below</li>
-              <li>Fill in user details (name, email are required)</li>
+              <li>Fill in user details (name and phone are required)</li>
               <li>Password: leave empty to auto-generate</li>
               <li>QR Code: leave empty to auto-generate, or provide existing code</li>
+              <li>For repeated links in any column, separate values with a comma</li>
               <li>Upload the completed file</li>
             </ol>
           </div>
@@ -202,7 +203,7 @@ export default function BulkUploadPage() {
                         <tr>
                           <th className="px-3 py-2 text-left">Row</th>
                           <th className="px-3 py-2 text-left">Name</th>
-                          <th className="px-3 py-2 text-left">Email</th>
+                          <th className="px-3 py-2 text-left">Phone</th>
                           <th className="px-3 py-2 text-left">Password</th>
                           <th className="px-3 py-2 text-left">QR Code</th>
                         </tr>
@@ -212,7 +213,7 @@ export default function BulkUploadPage() {
                           <tr key={idx} className="border-t">
                             <td className="px-3 py-2">{item.row}</td>
                             <td className="px-3 py-2">{item.user.name}</td>
-                            <td className="px-3 py-2">{item.user.email}</td>
+                            <td className="px-3 py-2">{item.user.phone || item.user.email}</td>
                             <td className="px-3 py-2 font-mono text-xs">
                               {item.user.password}
                             </td>
@@ -239,7 +240,7 @@ export default function BulkUploadPage() {
                         <tr>
                           <th className="px-3 py-2 text-left">Row</th>
                           <th className="px-3 py-2 text-left">Name</th>
-                          <th className="px-3 py-2 text-left">Email</th>
+                          <th className="px-3 py-2 text-left">Phone</th>
                           <th className="px-3 py-2 text-left">Error</th>
                         </tr>
                       </thead>
@@ -248,7 +249,7 @@ export default function BulkUploadPage() {
                           <tr key={idx} className="border-t">
                             <td className="px-3 py-2">{item.row}</td>
                             <td className="px-3 py-2">{item.data.name}</td>
-                            <td className="px-3 py-2">{item.data.email}</td>
+                            <td className="px-3 py-2">{item.data.phone}</td>
                             <td className="px-3 py-2 text-red-600">
                               {item.error}
                             </td>

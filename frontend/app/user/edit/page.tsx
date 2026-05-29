@@ -3,6 +3,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api"; // your axios/fetch wrapper
 import { ExternalLink } from "lucide-react";
+import {
+  PLATFORM_DEFINITIONS,
+  getBasePlatformId,
+  getNextPlatformKey,
+  getProfileEntryTitle,
+  normalizeLink,
+} from "@/lib/normalizeLink";
 
 type Platform = {
   id: string;
@@ -163,14 +170,7 @@ export default function EditProfilePage() {
 
   // fallback platforms if backend isn't ready
   function fallbackPlatforms(): Platform[] {
-    return [
-      { id: "website", title: "Website", category: "other", requires: "url" },
-      { id: "whatsapp", title: "WhatsApp", category: "contact", requires: "phone", template: "https://wa.me/{PHONE}" },
-      { id: "instagram", title: "Instagram", category: "social", requires: "text", template: "https://instagram.com/{VALUE}" },
-      { id: "facebook", title: "Facebook", category: "social", requires: "url" },
-      { id: "tiktok", title: "TikTok", category: "social", requires: "text", template: "https://tiktok.com/@{VALUE}" },
-      { id: "phone", title: "Phone", category: "contact", requires: "phone" },
-    ];
+    return PLATFORM_DEFINITIONS as Platform[];
   }
 
   // Validation helpers
@@ -196,29 +196,7 @@ export default function EditProfilePage() {
 
   function generateLink(platform: Platform, value: string) {
     if (!platform || !value) return value;
-    if (platform.template) {
-      return platform.template.replace("{PHONE}", digitsOnly(value)).replace("{VALUE}", encodeURIComponent(value));
-    }
-
-    // defaults
-    if (platform.id === "whatsapp") {
-      // ensure we have country code + digits to form wa.me link
-      let digits = digitsOnly(value);
-      // if value is phone without code, try attach countryCode if not present
-      if (!digits.startsWith("00") && !digits.startsWith("+") && !digits.startsWith(countryCode.replace("+", "")) && !digits.startsWith(countryCode)) {
-        digits = (countryCode.replace("+", "") || "") + digits;
-      }
-      return `https://wa.me/${digits}`;
-    }
-    if (platform.id === "instagram") {
-      const handle = value.replace(/^@/, "");
-      return `https://instagram.com/${handle}`;
-    }
-    if (platform.id === "website") {
-      if (/^https?:\/\//.test(value)) return value;
-      return `https://${value}`;
-    }
-    return value;
+    return normalizeLink(platform.id, value);
   }
 
   // Add field
@@ -227,11 +205,12 @@ export default function EditProfilePage() {
     if (!platform) return;
 
     const category = (platform.category || "other") as keyof ProfileSections;
-    const value = (platform.template || platform.requires) ? generateLink(platform, rawValue) : rawValue;
+    const entryKey = getNextPlatformKey(platform.id, (profile as any)[category] || {});
+    const value = generateLink(platform, rawValue);
 
     setProfile((prev) => ({
       ...prev,
-      [category]: { ...(prev as any)[category], [platformId]: value },
+      [category]: { ...(prev as any)[category], [entryKey]: value },
     }));
   }
 
@@ -372,7 +351,14 @@ async function saveProfile() {
 
     const cleanProfile: any = {};
     for (const section of Object.keys(profile) as (keyof ProfileSections)[]) {
-      cleanProfile[section] = { ...profile[section] };
+      cleanProfile[section] = {};
+      for (const [key, value] of Object.entries(profile[section])) {
+        if (value === null) {
+          cleanProfile[section][key] = null;
+          continue;
+        }
+        cleanProfile[section][key] = normalizeLink(getBasePlatformId(key), String(value));
+      }
     }
 
 const payload: any = {
@@ -428,8 +414,8 @@ const payload: any = {
 }
 
   // small helper: platform title lookup when rendering preview list
-  function getPlatformTitle(id: string) {
-    return platforms.find((p) => p.id === id)?.title || id;
+  function getPlatformTitle(id: string, value?: string | null) {
+    return getProfileEntryTitle(id, String(value || ""));
   }
 
   // search helper
@@ -469,7 +455,7 @@ const payload: any = {
                             <div key={k} className="flex items-center gap-3 opacity-60 text-sm text-rose-600">
                               <div className="w-8 h-8 bg-rose-50 rounded-full flex items-center justify-center text-rose-600">!</div>
                               <div className="text-sm">
-                                <div className="font-medium">{getPlatformTitle(k)}</div>
+                                  <div className="font-medium">{getPlatformTitle(k, deletedBuffer[s.key]?.[k] || "")}</div>
                                 <div className="text-xs">Will be removed after save</div>
                               </div>
                             </div>
@@ -479,7 +465,7 @@ const payload: any = {
                           <div key={k} className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">•</div>
                             <div className="text-sm text-gray-700">
-                              <div className="font-medium">{getPlatformTitle(k)}</div>
+                              <div className="font-medium">{getPlatformTitle(k, String(v))}</div>
                               <a href={String(v)} target="_blank" rel="noreferrer" className="text-xs text-gray-500 break-all inline-block">
                                 {v}
                               </a>
@@ -564,7 +550,7 @@ const payload: any = {
 
                 {(Object.entries(profile[activeTab] || {}) as [string, string | null][]).map(([plat, val]) => {
                   const platInfo = platforms.find((p) => p.id === plat);
-                  const title = platInfo?.title || plat;
+                  const title = getPlatformTitle(plat, String(val ?? ""));
                   const isPendingDelete = val === null;
 
                   return (

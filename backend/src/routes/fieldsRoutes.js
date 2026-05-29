@@ -18,7 +18,7 @@ router.get("/", (req, res) => {
                 title: "Instagram",
                 category: "social",
                 requires: "text",
-                template: "https://instagram.com/{VALUE}",
+                template: null,
                 icon: "instagram"
             },
             {
@@ -26,8 +26,32 @@ router.get("/", (req, res) => {
                 title: "Facebook",
                 category: "social",
                 requires: "text",
-                template: "https://www.facebook.com/{VALUE}",
+                template: null,
                 icon: "facebook"
+            },
+            {
+                id: "x",
+                title: "X",
+                category: "social",
+                requires: "text",
+                template: null,
+                icon: "x"
+            },
+            {
+                id: "threads",
+                title: "Threads",
+                category: "social",
+                requires: "text",
+                template: null,
+                icon: "threads"
+            },
+            {
+                id: "linkedin",
+                title: "LinkedIn",
+                category: "social",
+                requires: "text",
+                template: null,
+                icon: "linkedin"
             },
             {
                 id: "email",
@@ -54,19 +78,51 @@ router.get("/", (req, res) => {
                 icon: "globe"
             },
             {
+                id: "other",
+                title: "Other",
+                category: "other",
+                requires: "url",
+                template: null,
+                icon: "link"
+            },
+            {
                 id: "tiktok",
                 title: "TikTok",
                 category: "social",
                 requires: "text",
-                template: "https://tiktok.com/@{VALUE}",
+                template: null,
                 icon: "tiktok"
+            },
+            {
+                id: "youtube",
+                title: "YouTube",
+                category: "video",
+                requires: "text",
+                template: null,
+                icon: "youtube"
+            },
+            {
+                id: "paypal",
+                title: "PayPal",
+                category: "payment",
+                requires: "text",
+                template: null,
+                icon: "paypal"
+            },
+            {
+                id: "instapay",
+                title: "InstaPay",
+                category: "payment",
+                requires: "text",
+                template: null,
+                icon: "instapay"
             },
             {
                 id: "snapchat",
                 title: "Snapchat",
                 category: "social",
                 requires: "text",
-                template: "https://snapchat.com/add/{VALUE}",
+                template: null,
                 icon: "snap"
             }
         ]
