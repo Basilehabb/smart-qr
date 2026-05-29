@@ -17,19 +17,32 @@ function formatProfile(user) {
     const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
     const out = {};
     sections.forEach((sec) => {
-        const arr = user.profile[sec];
-        if (!arr || !Array.isArray(arr)) {
+        const value = user.profile[sec];
+        if (!value) {
             out[sec] = {};
             return;
         }
-        // ⭐ Convert array → object (preserving order)
-        const obj = {};
-        arr.forEach((item) => {
-            if (item.key && item.value) {
-                obj[item.key] = item.value;
-            }
-        });
-        out[sec] = obj;
+        if (Array.isArray(value)) {
+            const obj = {};
+            value.forEach((item) => {
+                if (item?.key && item?.value !== undefined && item?.value !== null) {
+                    obj[item.key] = String(item.value);
+                }
+            });
+            out[sec] = obj;
+            return;
+        }
+        if (typeof value === "object") {
+            const obj = {};
+            Object.entries(value).forEach(([key, entryValue]) => {
+                if (entryValue !== undefined && entryValue !== null && String(entryValue).trim() !== "") {
+                    obj[key] = String(entryValue);
+                }
+            });
+            out[sec] = obj;
+            return;
+        }
+        out[sec] = {};
     });
     return out;
 }

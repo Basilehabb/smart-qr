@@ -118,18 +118,32 @@ function formatProfile(userDoc) {
     const formatted = {};
     const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
     sections.forEach(section => {
-        const arr = userDoc?.profile?.[section];
-        if (!arr || !Array.isArray(arr)) {
+        const value = userDoc?.profile?.[section];
+        if (!value) {
             formatted[section] = {};
             return;
         }
-        const obj = {};
-        arr.forEach((item) => {
-            if (item.key && item.value) {
-                obj[item.key] = item.value;
-            }
-        });
-        formatted[section] = obj;
+        if (Array.isArray(value)) {
+            const obj = {};
+            value.forEach((item) => {
+                if (item?.key && item?.value !== undefined && item?.value !== null) {
+                    obj[item.key] = String(item.value);
+                }
+            });
+            formatted[section] = obj;
+            return;
+        }
+        if (typeof value === "object") {
+            const obj = {};
+            Object.entries(value).forEach(([key, entryValue]) => {
+                if (entryValue !== undefined && entryValue !== null && String(entryValue).trim() !== "") {
+                    obj[key] = String(entryValue);
+                }
+            });
+            formatted[section] = obj;
+            return;
+        }
+        formatted[section] = {};
     });
     return formatted;
 }
