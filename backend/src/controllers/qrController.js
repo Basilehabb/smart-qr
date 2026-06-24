@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.linkExistingQRToUser = exports.createQRForUser = exports.createQR = exports.getMyQr = exports.linkUserToQR = exports.getQRDetails = void 0;
+exports.linkExistingQRToUser = exports.createQRForUser = exports.createBulkQRs = exports.createQR = exports.getMyQr = exports.linkUserToQR = exports.getQRDetails = void 0;
 const QRCode_1 = __importDefault(require("../models/QRCode"));
 const ScanLog_1 = __importDefault(require("../models/ScanLog"));
 const nanoid_1 = require("nanoid");
@@ -47,6 +47,14 @@ function formatProfile(user) {
     return out;
 }
 const publicEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`) ? "" : String(email || "");
+const generateUniqueCode = async () => {
+    while (true) {
+        const code = (0, nanoid_1.nanoid)(10).toUpperCase();
+        const exists = await QRCode_1.default.findOne({ code });
+        if (!exists)
+            return code;
+    }
+};
 /*----------------------------------------
   PUBLIC — QR Scan
 ----------------------------------------*/
@@ -136,7 +144,7 @@ const createQR = async (req, res) => {
             return res.status(403).json({ message: "Admin only" });
         let { code } = req.body;
         if (!code)
-            code = (0, nanoid_1.nanoid)(10).toUpperCase();
+            code = await generateUniqueCode();
         const exists = await QRCode_1.default.findOne({ code });
         if (exists)
             return res.status(409).json({ message: "QR already exists" });
@@ -150,6 +158,35 @@ const createQR = async (req, res) => {
 };
 exports.createQR = createQR;
 /*----------------------------------------
+  ADMIN - Create Bulk QRs
+----------------------------------------*/
+const createBulkQRs = async (req, res) => {
+    try {
+        if (!req.user?.isAdmin)
+            return res.status(403).json({ message: "Admin only" });
+        const parsedCount = Number(req.body?.count);
+        if (!Number.isInteger(parsedCount) || parsedCount < 1 || parsedCount > 100) {
+            return res.status(400).json({ message: "Count must be an integer between 1 and 100" });
+        }
+        const created = [];
+        for (let i = 0; i < parsedCount; i += 1) {
+            const code = await generateUniqueCode();
+            const qr = await QRCode_1.default.create({ code });
+            created.push(qr);
+        }
+        res.status(201).json({
+            success: true,
+            count: created.length,
+            qrs: created
+        });
+    }
+    catch (err) {
+        console.error("createBulkQRs error:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+exports.createBulkQRs = createBulkQRs;
+/*----------------------------------------
   ADMIN — Create QR For User
 ----------------------------------------*/
 const createQRForUser = async (req, res) => {
@@ -157,7 +194,7 @@ const createQRForUser = async (req, res) => {
         if (!req.user?.isAdmin)
             return res.status(403).json({ message: "Admin only" });
         const { userId } = req.params;
-        const code = (0, nanoid_1.nanoid)(10).toUpperCase();
+        const code = await generateUniqueCode();
         const qr = await QRCode_1.default.create({ code, userId });
         res.json({ message: "QR created and linked", qr });
     }

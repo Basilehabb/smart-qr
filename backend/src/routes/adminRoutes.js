@@ -22,6 +22,7 @@ router.delete("/users/:userId", adminController_1.deleteUser);
 router.post("/users/:userId/reset-password", adminController_1.resetPassword);
 // QR Dashboard 
 router.post("/qrs", qrController_1.createQR);
+router.post("/qrs/bulk", qrController_1.createBulkQRs);
 router.get("/qrs", adminController_1.listQRs);
 router.patch("/qrs/:code/unlink", adminController_1.unlinkQR);
 router.delete("/qrs/:code", adminController_1.deleteQR);
