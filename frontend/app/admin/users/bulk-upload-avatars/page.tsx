@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import AdminSidebar from "../../AdminSidebar";
 import axios from "axios";
+import { handleAdminAuthError, getAdminTokenOrRedirect } from "@/lib/adminSession";
 
 
 export default function BulkAvatarsPage() {
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -18,7 +21,8 @@ export default function BulkAvatarsPage() {
     setResult(null);
 
     try {
-      const token = localStorage.getItem("admin-token");
+      const token = getAdminTokenOrRedirect(router);
+      if (!token) return;
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f));
 
@@ -35,6 +39,7 @@ export default function BulkAvatarsPage() {
 
       setResult(res.data.results);
     } catch (e: any) {
+      if (handleAdminAuthError(e, router)) return;
       alert(e?.response?.data?.message || "Upload failed");
     } finally {
       setLoading(false);

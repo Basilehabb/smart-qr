@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { getAdminTokenOrRedirect, handleAdminAuthError, redirectToAdminLogin } from "@/lib/adminSession";
 import AdminSidebar from "../AdminSidebar";
+import QRCode from "qrcode";
+import jsPDF from "jspdf";
 
 export default function AdminQRsPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [qrs, setQrs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
@@ -17,12 +21,14 @@ export default function AdminQRsPage() {
   // For Create QR Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCode, setNewCode] = useState("");
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkCount, setBulkCount] = useState("10");
+  const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin-token");
-
+    const token = getAdminTokenOrRedirect(router);
     if (!token) {
-      router.push("/login");
+      setIsRedirecting(true);
       return;
     }
 
@@ -33,7 +39,8 @@ export default function AdminQRsPage() {
         });
 
         if (!me.data.user.isAdmin) {
-          router.push("/login");
+          setIsRedirecting(true);
+          redirectToAdminLogin(router);
           return;
         }
 
@@ -46,7 +53,10 @@ export default function AdminQRsPage() {
         setQrs(res.data);
       } catch (err) {
         console.error(err);
-        router.push("/login");
+        if (handleAdminAuthError(err, router)) {
+          setIsRedirecting(true);
+          return;
+        }
       } finally {
         setLoading(false);
       }
@@ -58,7 +68,8 @@ export default function AdminQRsPage() {
   // Create QR
   // ==========================
   const createQR = async () => {
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) return;
 
     try {
       const res = await api.post(
@@ -73,7 +84,90 @@ export default function AdminQRsPage() {
 
       alert("QR Created Successfully!");
     } catch (err: any) {
+      if (handleAdminAuthError(err, router)) return;
       alert(err.response?.data?.message || "Failed to create QR");
+    }
+  };
+
+  const downloadBulkQrsPdf = async (codes: string[]) => {
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true,
+    });
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 12;
+    const columns = 3;
+    const rows = 4;
+    const gap = 10;
+    const pageSize = columns * rows;
+    const cellWidth = (pageWidth - margin * 2 - gap * (columns - 1)) / columns;
+    const cellHeight = (pageHeight - margin * 2 - gap * (rows - 1)) / rows;
+    const qrSize = Math.min(cellWidth, cellHeight);
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+    for (let i = 0; i < codes.length; i += 1) {
+      if (i > 0 && i % pageSize === 0) {
+        pdf.addPage("a4", "portrait");
+      }
+
+      const indexOnPage = i % pageSize;
+      const column = indexOnPage % columns;
+      const row = Math.floor(indexOnPage / columns);
+      const cellX = margin + column * (cellWidth + gap);
+      const cellY = margin + row * (cellHeight + gap);
+      const targetUrl = `${baseUrl}/qr/${codes[i]}`;
+      const imageData = await QRCode.toDataURL(targetUrl, {
+        width: 1400,
+        margin: 1,
+        errorCorrectionLevel: "H",
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF",
+        },
+      });
+
+      pdf.addImage(imageData, "PNG", cellX, cellY, qrSize, qrSize, undefined, "FAST");
+    }
+
+    pdf.save(`smart-qr-bulk-${codes.length}.pdf`);
+  };
+
+  const createBulkQrs = async () => {
+    const count = Number(bulkCount);
+
+    if (!Number.isInteger(count) || count < 1 || count > 100) {
+      alert("Please enter a number between 1 and 100");
+      return;
+    }
+
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) return;
+    setIsGeneratingBulk(true);
+
+    try {
+      const res = await api.post(
+        "/admin/qrs/bulk",
+        { count },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const createdQrs = res.data.qrs || [];
+      const createdCodes = createdQrs.map((qr: any) => qr.code);
+
+      setQrs((prev) => [...createdQrs, ...prev]);
+      await downloadBulkQrsPdf(createdCodes);
+      setShowBulkModal(false);
+      setBulkCount("10");
+
+      alert(`${createdCodes.length} QR codes created and downloaded as high-quality PDF successfully!`);
+    } catch (err: any) {
+      if (handleAdminAuthError(err, router)) return;
+      alert(err.response?.data?.message || "Failed to create QR codes");
+    } finally {
+      setIsGeneratingBulk(false);
     }
   };
 
@@ -84,13 +178,19 @@ export default function AdminQRsPage() {
   const deleteQR = async (code: string) => {
     if (!confirm("Delete this QR?")) return;
 
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) return;
 
-    await api.delete(`/admin/qrs/${code}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    try {
+      await api.delete(`/admin/qrs/${code}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    setQrs(prev => prev.filter(q => q.code !== code));
+      setQrs(prev => prev.filter(q => q.code !== code));
+    } catch (err) {
+      if (handleAdminAuthError(err, router)) return;
+      alert("Failed to delete QR");
+    }
   };
 
   // ==========================
@@ -99,20 +199,26 @@ export default function AdminQRsPage() {
   const unlinkQR = async (code: string) => {
     if (!confirm("Unlink this QR?")) return;
 
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) return;
 
-    await api.patch(`/admin/qrs/${code}/unlink`, {}, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    try {
+      await api.patch(`/admin/qrs/${code}/unlink`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    setQrs(prev =>
-      prev.map(q =>
-        q.code === code ? { ...q, userId: null } : q
-      )
-    );
+      setQrs(prev =>
+        prev.map(q =>
+          q.code === code ? { ...q, userId: null } : q
+        )
+      );
+    } catch (err) {
+      if (handleAdminAuthError(err, router)) return;
+      alert("Failed to unlink QR");
+    }
   };
 
-  if (loading) return <p className="text-center mt-20">Loading...</p>;
+  if (loading || isRedirecting) return <p className="text-center mt-20">Loading...</p>;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -127,12 +233,20 @@ export default function AdminQRsPage() {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">All QR Codes</h1>
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded"
-            >
-              + Create QR
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkModal(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded"
+              >
+                Bulk Generate
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded"
+              >
+                + Create QR
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -248,6 +362,45 @@ export default function AdminQRsPage() {
                 onClick={createQR}
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Bulk Generate QR Codes</h2>
+
+            <input
+              type="number"
+              min={1}
+              max={100}
+              className="border px-3 py-2 rounded w-full mb-3"
+              placeholder="How many QR codes?"
+              value={bulkCount}
+              onChange={(e) => setBulkCount(e.target.value)}
+            />
+
+            <p className="text-gray-500 text-sm mb-4">
+              Generate from 1 to 100 QR codes in one batch, then auto-download one high-quality PDF file.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 border rounded"
+                onClick={() => !isGeneratingBulk && setShowBulkModal(false)}
+                disabled={isGeneratingBulk}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50"
+                onClick={createBulkQrs}
+                disabled={isGeneratingBulk}
+              >
+                {isGeneratingBulk ? "Generating..." : "Generate & Download"}
               </button>
             </div>
           </div>

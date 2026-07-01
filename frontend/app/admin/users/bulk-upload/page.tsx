@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { getAdminTokenOrRedirect, handleAdminAuthError, redirectToAdminLogin } from "@/lib/adminSession";
 import AdminSidebar from "../../AdminSidebar";
 
 export default function BulkUploadPage() {
@@ -12,11 +13,17 @@ export default function BulkUploadPage() {
   const [results, setResults] = useState<any>(null);
 
   const downloadTemplate = async () => {
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) return;
     
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/users/template`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (response.status === 401 || response.status === 403) {
+      redirectToAdminLogin(router);
+      return;
+    }
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -33,7 +40,8 @@ export default function BulkUploadPage() {
     setResults(null);
 
     try {
-      const token = localStorage.getItem("admin-token");
+      const token = getAdminTokenOrRedirect(router);
+      if (!token) return;
       const formData = new FormData();
       formData.append("file", file);
 
@@ -46,6 +54,7 @@ export default function BulkUploadPage() {
 
       setResults(response.data.results);
     } catch (error: any) {
+      if (handleAdminAuthError(error, router)) return;
       alert(error?.response?.data?.message || "Upload failed");
     } finally {
       setUploading(false);

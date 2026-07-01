@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { getAdminTokenOrRedirect, handleAdminAuthError } from "@/lib/adminSession";
 import AdminSidebar from "../AdminSidebar";
 
 interface ScanLogItem {
@@ -15,11 +16,12 @@ export default function ScanAnalyticsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<ScanLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
     if (!token) {
-      router.push("/login");
+      setIsRedirecting(true);
       return;
     }
 
@@ -31,14 +33,17 @@ export default function ScanAnalyticsPage() {
         setLogs(res.data || []);
       } catch (err) {
         console.error(err);
-        router.push("/login");
+        if (handleAdminAuthError(err, router)) {
+          setIsRedirecting(true);
+          return;
+        }
       } finally {
         setLoading(false);
       }
     })();
   }, [router]);
 
-  if (loading)
+  if (loading || isRedirecting)
     return <p className="text-center mt-10">Loading scans...</p>;
 
   return (

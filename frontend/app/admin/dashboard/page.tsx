@@ -3,21 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { getAdminTokenOrRedirect, handleAdminAuthError } from "@/lib/adminSession";
 import AdminSidebar from "../AdminSidebar";
 
 export default function AdminDashboard() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [overview, setOverview] = useState<any>(null);
   const [latestUsers, setLatestUsers] = useState<any[]>([]);
   const [latestQRs, setLatestQRs] = useState<any[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin-token");
-
+    const token = getAdminTokenOrRedirect(router);
     if (!token) {
-      router.push("/login");
+      setIsRedirecting(true);
       return;
     }
 
@@ -43,14 +44,19 @@ export default function AdminDashboard() {
 
       } catch (err) {
         console.error(err);
-        router.push("/login");
+        if (handleAdminAuthError(err, router)) {
+          setIsRedirecting(true);
+          return;
+        }
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
-  if (loading) return <p className="text-center mt-10">Loading dashboard...</p>;
+  if (loading || isRedirecting || !overview) {
+    return <p className="text-center mt-10">Loading dashboard...</p>;
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-100">

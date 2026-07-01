@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { getAdminTokenOrRedirect, handleAdminAuthError } from "@/lib/adminSession";
 import AdminSidebar from "../../AdminSidebar";
 import { ExternalLink } from "lucide-react";
 import {
@@ -53,6 +54,7 @@ export default function UserDetailsPage() {
   const [qrs, setQrs] = useState<any[]>([]);
   const [allQrs, setAllQrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
@@ -91,8 +93,11 @@ export default function UserDetailsPage() {
   ];
 
   useEffect(() => {
-    const token = localStorage.getItem("admin-token");
-    if (!token) return router.push("/login");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
 
     (async () => {
       try {
@@ -185,7 +190,12 @@ export default function UserDetailsPage() {
 
         setAllQrs(qrRes.data);
         setQrs(qrRes.data.filter((qr: any) => qr.userId?._id === userId));
-      } catch {
+      } catch (error) {
+        if (handleAdminAuthError(error, router)) {
+          setIsRedirecting(true);
+          return;
+        }
+
         router.push("/admin/dashboard");
       } finally {
         setLoading(false);
@@ -321,7 +331,11 @@ export default function UserDetailsPage() {
   const filteredPlatforms = platforms.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const saveUser = async () => {
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
 
     if (!isEmail(editData.email)) {
       return alert("Invalid email");
@@ -372,64 +386,139 @@ export default function UserDetailsPage() {
       window.location.reload();
       
     } catch (error: any) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
       console.error("Save error:", error);
       alert(error?.response?.data?.message || "Failed to save user");
     }
   };
 
   const createQRForUser = async () => {
-    const token = localStorage.getItem("admin-token");
-    const res = await api.post(
-      `/admin/users/${userId}/qrs`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    alert("QR Created & Linked: " + res.data.qr.code);
-    router.refresh();
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
+
+    try {
+      const res = await api.post(
+        `/admin/users/${userId}/qrs`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("QR Created & Linked: " + res.data.qr.code);
+      router.refresh();
+    } catch (error) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
+      alert("Failed to create QR");
+    }
   };
 
   const linkExistingQR = async () => {
     if (!selectedQR) return alert("Select a QR");
-    const token = localStorage.getItem("admin-token");
-    await api.patch(
-      `/admin/users/${userId}/qrs/link`,
-      { code: selectedQR },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    alert("QR Linked!");
-    router.refresh();
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
+
+    try {
+      await api.patch(
+        `/admin/users/${userId}/qrs/link`,
+        { code: selectedQR },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("QR Linked!");
+      router.refresh();
+    } catch (error) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
+      alert("Failed to link QR");
+    }
   };
 
   const unlinkQR = async (code: string) => {
-    const token = localStorage.getItem("admin-token");
-    await api.patch(`/admin/qrs/${code}/unlink`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    alert("QR Unlinked");
-    router.refresh();
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
+
+    try {
+      await api.patch(`/admin/qrs/${code}/unlink`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      alert("QR Unlinked");
+      router.refresh();
+    } catch (error) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
+      alert("Failed to unlink QR");
+    }
   };
 
   const deleteUser = async () => {
     if (!confirm("Are you sure?")) return;
-    const token = localStorage.getItem("admin-token");
-    await api.delete(`/admin/users/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    alert("User deleted");
-    router.push("/admin/users");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
+
+    try {
+      await api.delete(`/admin/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      alert("User deleted");
+      router.push("/admin/users");
+    } catch (error) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
+      alert("Failed to delete user");
+    }
   };
 
   const resetPassword = async () => {
-    const token = localStorage.getItem("admin-token");
-    const res = await api.post(
-      `/admin/users/${userId}/reset-password`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    alert("Temporary Password: " + res.data.tempPassword);
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
+
+    try {
+      const res = await api.post(
+        `/admin/users/${userId}/reset-password`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("Temporary Password: " + res.data.tempPassword);
+    } catch (error) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
+      alert("Failed to reset password");
+    }
   };
 
-  if (loading) return <p className="text-center mt-20">Loading user...</p>;
+  if (loading || isRedirecting) return <p className="text-center mt-20">Loading user...</p>;
   if (!user) return <p className="text-center text-red-600 mt-20">User not found</p>;
 
   return (

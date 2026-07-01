@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { getAdminTokenOrRedirect, handleAdminAuthError } from "@/lib/adminSession";
 import AdminSidebar from "../AdminSidebar";
 import qs from "qs";
 
@@ -16,6 +17,7 @@ export default function AdminUsersPage() {
 
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // filters state (keeps in sync with URL)
   const [search, setSearch] = useState("");
@@ -73,7 +75,12 @@ export default function AdminUsersPage() {
 
       const queryString = qs.stringify(q, { addQueryPrefix: true, arrayFormat: "brackets" });
 
-      const token = localStorage.getItem("admin-token");
+      const token = getAdminTokenOrRedirect(router);
+      if (!token) {
+        setIsRedirecting(true);
+        return;
+      }
+
       const res = await api.get(`/admin/users${queryString}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -87,6 +94,11 @@ export default function AdminUsersPage() {
       }
 
     } catch (e) {
+      if (handleAdminAuthError(e, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
       console.error("fetch users error:", e);
     } finally {
       setLoading(false);
@@ -118,16 +130,29 @@ export default function AdminUsersPage() {
   const deleteUser = async (userId: string) => {
     if (!confirm("هل تريد حذف هذا المستخدم؟")) return;
 
-    const token = localStorage.getItem("admin-token");
+    const token = getAdminTokenOrRedirect(router);
+    if (!token) {
+      setIsRedirecting(true);
+      return;
+    }
 
-    await api.delete(`/admin/users/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    try {
+      await api.delete(`/admin/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    fetchUsers();
+      fetchUsers();
+    } catch (error) {
+      if (handleAdminAuthError(error, router)) {
+        setIsRedirecting(true);
+        return;
+      }
+
+      alert("Failed to delete user");
+    }
   };
 
-  if (loading) return <p className="text-center mt-20">Loading...</p>;
+  if (loading || isRedirecting) return <p className="text-center mt-20">Loading...</p>;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
