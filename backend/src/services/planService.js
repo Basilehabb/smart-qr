@@ -70,7 +70,7 @@ const countByBaseType = (entries) => {
   return count;
 };
 
-const validateProfileAgainstPlan = (plan, profile, currentProfile = {}) => {
+const validateProfileAgainstPlan = (plan, profile, currentProfile = {}, options = {}) => {
   if (!plan) return { feature: "canEditProfile" };
 
   const features = plan.features || {};
@@ -80,7 +80,7 @@ const validateProfileAgainstPlan = (plan, profile, currentProfile = {}) => {
     ? features.maxLinks
     : null;
 
-  if (features.canEditProfile === false && incomingEntries.length > currentEntries.length) {
+  if (!options.allowInitialProfile && features.canEditProfile === false && incomingEntries.length > currentEntries.length) {
     return { feature: "canEditProfile" };
   }
 

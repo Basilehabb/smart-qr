@@ -193,7 +193,7 @@ const registerAndLinkQr = async (req, res) => {
             name: planRow.name,
             features: typeof planRow.features === "string" ? JSON.parse(planRow.features) : (planRow.features || {}),
         };
-        const restriction = (0, planService_1.validateProfileAgainstPlan)(plan, incomingProfile, {});
+        const restriction = (0, planService_1.validateProfileAgainstPlan)(plan, incomingProfile, {}, { allowInitialProfile: true });
         if (restriction) {
             await client.query("ROLLBACK");
             return res.status(403).json({ code: "UPGRADE_REQUIRED", feature: restriction.feature });
