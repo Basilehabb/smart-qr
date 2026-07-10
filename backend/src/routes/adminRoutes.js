@@ -9,11 +9,17 @@ const qrController_1 = require("../controllers/qrController");
 const router = (0, express_1.Router)();
 router.use(authMiddleware_1.verifyToken, authMiddleware_1.verifyAdmin);
 router.get("/overview", adminController_1.getOverview);
+// Subscription plans
+router.get("/plans", adminController_1.getPlans);
+router.post("/plans", adminController_1.createPlan);
+router.put("/plans/:id", adminController_1.updatePlan);
+router.delete("/plans/:id", adminController_1.deletePlan);
 // Bulk upload
 router.post("/users/bulk-upload", upload_1.upload.single("file"), adminController_1.bulkUploadUsers);
 router.get("/users/template", adminController_1.downloadTemplate);
 router.post("/users/bulk-upload-avatars", upload_2.uploadMultiple.array("files"), adminController_1.bulkUploadUserAvatars);
 router.post("/users/:userId/avatar", upload_1.upload.single("file"), adminController_1.uploadUserAvatarAdmin);
+router.put("/users/:userId/plan", adminController_1.assignUserPlan);
 // Users
 router.get("/users", adminController_1.listUsers);
 router.post("/users", adminController_1.createUser);

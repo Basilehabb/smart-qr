@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bulkUploadUserAvatars = exports.uploadUserAvatarAdmin = exports.resetPassword = exports.scanAnalytics = exports.deleteQR = exports.unlinkQR = exports.listQRs = exports.deleteUser = exports.updateUserProfileAdmin = exports.updateUser = exports.getUser = exports.createUser = exports.listUsers = exports.getOverview = exports.downloadTemplate = exports.bulkUploadUsers = void 0;
 const User_1 = __importDefault(require("../models/User"));
+const Plan_1 = __importDefault(require("../models/Plan"));
 const QRCode_1 = __importDefault(require("../models/QRCode"));
 const ScanLog_1 = __importDefault(require("../models/ScanLog"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -151,13 +152,48 @@ const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
 const buildInternalEmail = (phone) => `${normalizePhone(phone)}@${INTERNAL_EMAIL_DOMAIN}`;
 const isInternalEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
 const publicEmail = (email) => isInternalEmail(email) ? "" : String(email || "");
-const serializeAdminUser = (userDoc) => {
+const serializePlan = (plan) => ({
+    id: plan.id,
+    key: plan.key,
+    name: plan.name,
+    isActive: plan.isActive,
+    isDefault: plan.isDefault,
+    features: plan.features || {},
+});
+const serializeAdminUser = async (userDoc) => {
     const userObj = typeof userDoc?.toObject === "function" ? userDoc.toObject() : { ...userDoc };
     userObj.profile = formatProfile(userDoc);
     userObj.email = publicEmail(userObj.email);
     userObj.loginPhone = userObj.phone || "";
+    const plan = userObj.planId ? await Plan_1.default.findById(userObj.planId) : null;
+    userObj.plan = plan ? serializePlan(plan) : null;
     delete userObj.passwordHash;
     return userObj;
+};
+const planSections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
+const normalizePlanFeatures = (features) => {
+    if (!features || typeof features !== "object" || Array.isArray(features)) {
+        throw new Error("Features must be an object");
+    }
+    const rawMaxLinks = features.maxLinks;
+    const maxLinks = rawMaxLinks === undefined || rawMaxLinks === null || rawMaxLinks === ""
+        ? null
+        : Number(rawMaxLinks);
+    if (maxLinks !== null && (!Number.isInteger(maxLinks) || maxLinks < 0)) {
+        throw new Error("maxLinks must be a non-negative integer or empty for unlimited");
+    }
+    const blockedSections = features.blockedSections === undefined ? [] : features.blockedSections;
+    if (!Array.isArray(blockedSections) || blockedSections.some((section) => !planSections.includes(section))) {
+        throw new Error("blockedSections contains an invalid section");
+    }
+    return {
+        ...features,
+        canEditProfile: features.canEditProfile !== false,
+        maxLinks,
+        allowDuplicateType: features.allowDuplicateType === true,
+        blockedSections: [...new Set(blockedSections)],
+        showLolyLogo: features.showLolyLogo !== false,
+    };
 };
 /* ======================================================
    1) BULK UPLOAD USERS
@@ -362,12 +398,139 @@ const getOverview = async (req, res) => {
 };
 exports.getOverview = getOverview;
 /* ======================================================
-   4) USERS LIST (WITH FORMATTED PROFILE)
+   4) SUBSCRIPTION PLANS
+====================================================== */
+const getPlans = async (req, res) => {
+    try {
+        const plans = await Plan_1.default.findAll();
+        const serialized = await Promise.all(plans.map(async (plan) => ({
+            ...serializePlan(plan),
+            assignedUsers: await Plan_1.default.countAssignedUsers(plan.id),
+        })));
+        return res.json({ plans: serialized });
+    }
+    catch (err) {
+        console.error("getPlans error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getPlans = getPlans;
+const createPlan = async (req, res) => {
+    try {
+        const key = String(req.body?.key || "").trim().toLowerCase();
+        const name = String(req.body?.name || "").trim();
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(key)) {
+            return res.status(400).json({ message: "Plan key must use lowercase letters, numbers, and hyphens only" });
+        }
+        if (!name) return res.status(400).json({ message: "Plan name is required" });
+        if (await Plan_1.default.findByKey(key)) {
+            return res.status(409).json({ code: "PLAN_KEY_EXISTS", message: "A plan with this key already exists" });
+        }
+        const isActive = req.body?.isActive !== false;
+        const isDefault = req.body?.isDefault === true;
+        if (isDefault && !isActive) {
+            return res.status(400).json({ message: "The default plan must be active" });
+        }
+        const plan = await Plan_1.default.create({
+            key,
+            name,
+            isActive,
+            isDefault: false,
+            features: normalizePlanFeatures(req.body?.features || {}),
+        });
+        const savedPlan = isDefault ? await Plan_1.default.setDefault(plan.id) : plan;
+        return res.status(201).json({ plan: serializePlan(savedPlan) });
+    }
+    catch (err) {
+        console.error("createPlan error:", err);
+        return res.status(400).json({ message: err.message || "Could not create plan" });
+    }
+};
+exports.createPlan = createPlan;
+const updatePlan = async (req, res) => {
+    try {
+        const plan = await Plan_1.default.findById(req.params.id);
+        if (!plan) return res.status(404).json({ message: "Plan not found" });
+        if (req.body?.key !== undefined && String(req.body.key) !== plan.key) {
+            return res.status(400).json({ code: "PLAN_KEY_IMMUTABLE", message: "Plan key cannot be changed" });
+        }
+        const nextIsActive = req.body?.isActive === undefined ? plan.isActive : req.body.isActive === true;
+        const nextIsDefault = req.body?.isDefault === undefined ? plan.isDefault : req.body.isDefault === true;
+        if (nextIsDefault && !nextIsActive) {
+            return res.status(400).json({ message: "The default plan must be active" });
+        }
+        if (plan.isDefault && !nextIsDefault) {
+            return res.status(400).json({ message: "Set another plan as default before removing the current default" });
+        }
+        if (plan.isDefault && !nextIsActive) {
+            return res.status(400).json({ message: "Set another plan as default before deactivating the current default" });
+        }
+        if (req.body?.name !== undefined) {
+            const name = String(req.body.name || "").trim();
+            if (!name) return res.status(400).json({ message: "Plan name is required" });
+            plan.name = name;
+        }
+        if (req.body?.features !== undefined) plan.features = normalizePlanFeatures(req.body.features);
+        plan.isActive = nextIsActive;
+        // Save first without claiming the default slot; setDefault swaps it safely afterwards.
+        const shouldBecomeDefault = nextIsDefault && !plan.isDefault;
+        plan.isDefault = shouldBecomeDefault ? false : nextIsDefault;
+        const savedPlan = await plan.save();
+        const defaultedPlan = shouldBecomeDefault ? await Plan_1.default.setDefault(savedPlan.id) : savedPlan;
+        return res.json({ plan: serializePlan(defaultedPlan) });
+    }
+    catch (err) {
+        console.error("updatePlan error:", err);
+        return res.status(400).json({ message: err.message || "Could not update plan" });
+    }
+};
+exports.updatePlan = updatePlan;
+const deletePlan = async (req, res) => {
+    try {
+        const plan = await Plan_1.default.findById(req.params.id);
+        if (!plan) return res.status(404).json({ message: "Plan not found" });
+        if (plan.isDefault) {
+            return res.status(409).json({ code: "DEFAULT_PLAN", message: "The default plan cannot be deleted" });
+        }
+        const assignedUsers = await Plan_1.default.countAssignedUsers(plan.id);
+        if (assignedUsers > 0) {
+            return res.status(409).json({ code: "PLAN_IN_USE", message: "This plan is assigned to users. Deactivate it instead." });
+        }
+        await Plan_1.default.deleteById(plan.id);
+        return res.json({ message: "Plan deleted" });
+    }
+    catch (err) {
+        console.error("deletePlan error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+exports.deletePlan = deletePlan;
+const assignUserPlan = async (req, res) => {
+    try {
+        const user = await User_1.default.findById(req.params.userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+        const plan = await Plan_1.default.findById(req.body?.planId);
+        if (!plan) return res.status(404).json({ message: "Plan not found" });
+        if (!plan.isActive) {
+            return res.status(400).json({ code: "PLAN_INACTIVE", message: "Inactive plans cannot be assigned" });
+        }
+        user.planId = plan.id;
+        const savedUser = await user.save();
+        return res.json({ user: await serializeAdminUser(savedUser) });
+    }
+    catch (err) {
+        console.error("assignUserPlan error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+exports.assignUserPlan = assignUserPlan;
+/* ======================================================
+   5) USERS LIST (WITH FORMATTED PROFILE)
 ====================================================== */
 const listUsers = async (req, res) => {
     try {
         // Parse query params
-        const { search, isAdmin, hasQR, job, phoneExists, createdFrom, createdTo, sort, } = req.query;
+        const { search, isAdmin, hasQR, job, phoneExists, createdFrom, createdTo, sort, plan: planFilter, } = req.query;
         const page = Math.max(1, parseInt(req.query.page || "1")) || 1;
         const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || "20"))) || 20;
         // Build Mongo filter
@@ -391,6 +554,14 @@ const listUsers = async (req, res) => {
             filter.phone = { $exists: true, $ne: "" };
         else if (phoneExists === "false")
             filter.$or = (filter.$or || []).concat([{ phone: "" }, { phone: { $exists: false } }]);
+        if (planFilter) {
+            const plan = (await Plan_1.default.findById(String(planFilter))) ||
+                (await Plan_1.default.findByKey(String(planFilter)));
+            if (!plan) {
+                return res.json({ users: [], meta: { total: 0, page, limit, pages: 1 } });
+            }
+            filter.planId = plan.id;
+        }
         // createdAt range
         if (createdFrom || createdTo) {
             filter.createdAt = {};
@@ -442,12 +613,12 @@ const listUsers = async (req, res) => {
             qrs = await QRCode_1.default.find().lean();
         }
         // Enrich users with qrCount and format profile
-        const enriched = users.map((u) => {
+        const enriched = await Promise.all(users.map(async (u) => {
             const qrCount = qrs.filter((q) => q.userId && String(q.userId) === String(u._id)).length;
-            const out = serializeAdminUser(u);
+            const out = await serializeAdminUser(u);
             out.qrCount = qrCount;
             return out;
-        });
+        }));
         // If hasQR filter true => keep only users with qrCount > 0
         let final = enriched;
         if (hasQR === "true")
@@ -491,7 +662,7 @@ const createUser = async (req, res) => {
             job,
             isAdmin: true
         });
-        const userObj = serializeAdminUser(user);
+        const userObj = await serializeAdminUser(user);
         return res.json({ user: userObj });
     }
     catch (err) {
@@ -512,7 +683,7 @@ const getUser = async (req, res) => {
         // ⭐ Get all QR codes linked to this user
         const qrCodes = await QRCode_1.default.find({ userId }).select("code createdAt");
         // ⭐ Format profile correctly
-        const userObj = serializeAdminUser(user);
+        const userObj = await serializeAdminUser(user);
         // ⭐ Include linked QR codes in response
         userObj.qrCodes = qrCodes;
         return res.json({ user: userObj });
@@ -553,7 +724,7 @@ const updateUser = async (req, res) => {
             user.passwordHash = await bcryptjs_1.default.hash(String(data.password), 10);
         }
         await user.save();
-        const userObj = serializeAdminUser(user);
+        const userObj = await serializeAdminUser(user);
         return res.json({ user: userObj });
     }
     catch (err) {
@@ -610,7 +781,7 @@ const updateUserProfileAdmin = async (req, res) => {
             user.markModified("profile");
         }
         await user.save();
-        const userObj = serializeAdminUser(user);
+        const userObj = await serializeAdminUser(user);
         return res.json({ user: userObj });
     }
     catch (err) {

@@ -7,6 +7,7 @@ exports.linkExistingQRToUser = exports.createQRForUser = exports.createBulkQRs =
 const QRCode_1 = __importDefault(require("../models/QRCode"));
 const ScanLog_1 = __importDefault(require("../models/ScanLog"));
 const nanoid_1 = require("nanoid");
+const planService_1 = require("../services/planService");
 const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 /*----------------------------------------
   ⭐ PROFILE FORMATTER (array → object)
@@ -77,6 +78,7 @@ const getQRDetails = async (req, res) => {
             });
         }
         const user = qr.userId;
+        const plan = await (0, planService_1.getPlanForUser)(user._id || user.id);
         return res.json({
             code,
             linked: true,
@@ -88,6 +90,7 @@ const getQRDetails = async (req, res) => {
                 countryCode: user.countryCode || "",
                 job: user.job || "",
                 avatar: user.avatar || "",
+                showLolyLogo: plan?.features?.showLolyLogo !== false,
                 profile: formatProfile(user)
             }
         });

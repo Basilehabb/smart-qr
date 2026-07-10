@@ -8,6 +8,7 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
 const userService_1 = require("../services/userService");
+const planService_1 = require("../services/planService");
 const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 /*----------------------------------------
   TOKEN GENERATOR
@@ -23,9 +24,13 @@ const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
 const buildInternalEmail = (phone) => `${normalizePhone(phone)}@${INTERNAL_EMAIL_DOMAIN}`;
 const isInternalEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
 const publicEmail = (email) => (isInternalEmail(email) ? "" : String(email || ""));
-const serializeUser = (userDoc) => {
+const serializeUser = async (userDoc) => {
     const userObj = userDoc.toObject();
     userObj.profile = formatProfileFromDoc(userDoc);
+    const plan = await (0, planService_1.getPlanForUser)(userDoc._id || userDoc.id);
+    userObj.plan = plan
+        ? { key: plan.key, name: plan.name, features: plan.features }
+        : null;
     delete userObj.passwordHash;
     userObj.email = publicEmail(userObj.email);
     return userObj;
@@ -95,7 +100,7 @@ const register = async (req, res) => {
             isAdmin: false
         });
         const token = generateToken(user);
-        const userObj = serializeUser(user);
+        const userObj = await serializeUser(user);
         return res.status(201).json({
             message: "User registered",
             token,
@@ -107,7 +112,8 @@ const register = async (req, res) => {
                 job: userObj.job,
                 avatar: userObj.avatar,
                 isAdmin: userObj.isAdmin,
-                profile: userObj.profile
+                profile: userObj.profile,
+                plan: userObj.plan
             }
         });
     }
@@ -136,7 +142,7 @@ const login = async (req, res) => {
         if (!isMatch)
             return res.status(400).json({ message: "Invalid credentials" });
         const token = generateToken(user);
-        const userObj = serializeUser(user);
+        const userObj = await serializeUser(user);
         res.json({
             message: "Login successful",
             token,
@@ -147,7 +153,8 @@ const login = async (req, res) => {
                 phone: userObj.phone,
                 avatar: userObj.avatar,
                 isAdmin: userObj.isAdmin,
-                profile: userObj.profile
+                profile: userObj.profile,
+                plan: userObj.plan
             }
         });
     }
@@ -185,9 +192,7 @@ const createAdminIfNotExists = async (req, res) => {
                 other: []
             }
         });
-        const adminObj = admin.toObject();
-        adminObj.profile = formatProfileFromDoc(admin);
-        delete adminObj.passwordHash;
+        const adminObj = await serializeUser(admin);
         res.json({ message: "Admin created", admin: adminObj });
     }
     catch (err) {
@@ -204,7 +209,7 @@ const getMe = async (req, res) => {
         const user = await User_1.default.findById(req.user.id);
         if (!user)
             return res.status(404).json({ message: "User not found" });
-        const userObj = serializeUser(user);
+        const userObj = await serializeUser(user);
         res.json({ user: userObj });
     }
     catch (error) {
@@ -223,6 +228,12 @@ const updateProfile = async (req, res) => {
         const user = await User_1.default.findById(userId);
         if (!user)
             return res.status(404).json({ message: "User not found" });
+        if (data.profile && typeof data.profile === "object") {
+            const restriction = await (0, planService_1.validateProfileForPlan)(user, data.profile);
+            if (restriction) {
+                return res.status(403).json({ code: "UPGRADE_REQUIRED", feature: restriction.feature });
+            }
+        }
         const nextPhone = data.phone !== undefined ? normalizePhone(data.phone) : user.phone;
         if (data.phone !== undefined && !nextPhone) {
             return res.status(400).json({ message: "Phone is required" });
@@ -294,7 +305,7 @@ const updateProfile = async (req, res) => {
         }
         await user.save();
         // Return formatted response
-        const userObj = serializeUser(user);
+        const userObj = await serializeUser(user);
         return res.json({ message: "Profile updated", user: userObj });
     }
     catch (err) {

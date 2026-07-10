@@ -16,7 +16,7 @@ router.post("/create-admin-if-not-exists", authController_1.createAdminIfNotExis
 // Get current authenticated user
 router.get("/me", authMiddleware_1.verifyToken, authController_1.getMe);
 // Update user profile
-router.put("/update", authMiddleware_1.verifyToken, authController_1.updateProfile);
+router.put("/update", authMiddleware_1.verifyToken, (0, authMiddleware_1.requireFeature)("canEditProfile"), authController_1.updateProfile);
 // ⭐⭐ NEW: Upload Avatar Route ⭐⭐
 router.post("/upload-avatar", authMiddleware_1.verifyToken, upload_1.upload.single("file"), uploadController_1.uploadAvatar);
 exports.default = router;

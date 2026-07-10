@@ -70,4 +70,71 @@ export const initPostgres = async () => {
     CREATE INDEX IF NOT EXISTS idx_qr_codes_user_id ON qr_codes(user_id);
     CREATE INDEX IF NOT EXISTS idx_scan_logs_code_scanned_at ON scan_logs(code, scanned_at DESC);
   `);
+
+  // Subscription plans are added independently so existing production data is preserved.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plans (
+      id TEXT PRIMARY KEY,
+      key TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_default BOOLEAN NOT NULL DEFAULT FALSE,
+      features JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_id TEXT REFERENCES plans(id);
+  `);
+
+  await pool.query(
+    `INSERT INTO plans (id, key, name, is_active, is_default, features, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+     ON CONFLICT (key) DO NOTHING`,
+    [
+      "plan_basic",
+      "basic",
+      "Basic",
+      true,
+      true,
+      JSON.stringify({
+        canEditProfile: true,
+        maxLinks: 3,
+        allowDuplicateType: false,
+        blockedSections: ["other"],
+        showLolyLogo: true,
+      }),
+    ]
+  );
+
+  await pool.query(
+    `INSERT INTO plans (id, key, name, is_active, is_default, features, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+     ON CONFLICT (key) DO NOTHING`,
+    [
+      "plan_pro",
+      "pro",
+      "Pro",
+      true,
+      false,
+      JSON.stringify({
+        canEditProfile: true,
+        maxLinks: null,
+        allowDuplicateType: true,
+        blockedSections: [],
+        showLolyLogo: true,
+      }),
+    ]
+  );
+
+  // Backfill before the constraint so no existing account loses its current capabilities.
+  await pool.query(`
+    UPDATE users
+    SET plan_id = (SELECT id FROM plans WHERE key = 'pro')
+    WHERE plan_id IS NULL;
+
+    ALTER TABLE users ALTER COLUMN plan_id SET NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_users_plan_id ON users(plan_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_single_default ON plans ((is_default)) WHERE is_default = TRUE;
+  `);
 };

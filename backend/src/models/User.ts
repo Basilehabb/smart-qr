@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { pool } from "../db/postgres";
+import Plan from "./Plan";
 import { QueryMany, QueryOne } from "./query";
 
 interface ProfileItem {
@@ -19,6 +20,7 @@ export interface UserDocument {
   avatar?: string;
   avatarPublicId?: string;
   isAdmin: boolean;
+  planId: string;
   profile?: Record<string, ProfileItem[]>;
   createdAt: Date;
   updatedAt: Date;
@@ -64,6 +66,7 @@ const rowToUser = (row: any): UserDocument | null => {
     avatar: row.avatar ?? "",
     avatarPublicId: row.avatar_public_id ?? "",
     isAdmin: Boolean(row.is_admin),
+    planId: row.plan_id,
     profile: normalizeProfile(row.profile),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -85,6 +88,7 @@ const rowToUser = (row: any): UserDocument | null => {
       avatar: user.avatar ?? "",
       avatarPublicId: user.avatarPublicId ?? "",
       isAdmin: user.isAdmin,
+      planId: user.planId,
       profile: normalizeProfile(user.profile),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -162,12 +166,15 @@ class User {
   static async create(data: any) {
     const id = data._id || data.id || crypto.randomUUID();
     const profile = normalizeProfile(data.profile);
+    const defaultPlan = data.planId || data.plan_id ? null : await Plan.getDefault();
+    const planId = data.planId || data.plan_id || defaultPlan?.id;
+    if (!planId) throw new Error("DEFAULT_PLAN_NOT_FOUND");
     const result = await pool.query(
       `INSERT INTO users (
         id, name, email, phone, country_code, job, password_hash, avatar,
-        avatar_public_id, is_admin, profile, created_at, updated_at
+        avatar_public_id, is_admin, profile, plan_id, created_at, updated_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())
       RETURNING *`,
       [
         id,
@@ -181,6 +188,7 @@ class User {
         data.avatarPublicId ?? data.avatar_public_id ?? "",
         data.isAdmin ?? data.is_admin ?? false,
         JSON.stringify(profile),
+        planId,
       ]
     );
 
@@ -192,7 +200,7 @@ class User {
       `UPDATE users
        SET name = $2, email = $3, phone = $4, country_code = $5, job = $6,
            password_hash = $7, avatar = $8, avatar_public_id = $9,
-           is_admin = $10, profile = $11, updated_at = NOW()
+           is_admin = $10, profile = $11, plan_id = $12, updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
       [
@@ -207,6 +215,7 @@ class User {
         user.avatarPublicId ?? "",
         user.isAdmin,
         JSON.stringify(normalizeProfile(user.profile)),
+        user.planId,
       ]
     );
 
