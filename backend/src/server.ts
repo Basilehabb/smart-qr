@@ -9,6 +9,7 @@ import fieldsRoutes from "./routes/fieldsRoutes";
 import qrRoutes from "./routes/qrRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import authRoutes from "./routes/authRoutes"; // ⬅ مهم جداً
+import { resumePendingCampaigns } from "./services/marketingQueueService";
 
 
 dotenv.config();
@@ -84,8 +85,9 @@ app.get("/", (req, res) => {
 // =====================================
 const port = process.env.PORT || 4000;
 initPostgres()
-  .then(() => {
+  .then(async () => {
     console.log("PostgreSQL connected successfully");
+    await resumePendingCampaigns().catch((err) => console.error("WhatsApp campaign resume failed", err));
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });

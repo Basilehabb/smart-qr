@@ -89,6 +89,26 @@ export const initPostgres = async () => {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS purchased_products JSONB NOT NULL DEFAULT '[]'::jsonb;
   `);
 
+  // Marketing campaigns are isolated from existing user and QR data.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marketing_campaigns (
+      id TEXT PRIMARY KEY,
+      message TEXT NOT NULL,
+      filters_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+      status TEXT NOT NULL DEFAULT 'queued',
+      total_users INTEGER NOT NULL DEFAULT 0,
+      success_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_created_at
+      ON marketing_campaigns(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_status
+      ON marketing_campaigns(status);
+  `);
+
   await pool.query(
     `INSERT INTO plans (id, key, name, is_active, is_default, features, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())

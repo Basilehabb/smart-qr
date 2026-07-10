@@ -6,8 +6,10 @@ const upload_1 = require("../middleware/upload");
 const upload_2 = require("../middleware/upload");
 const adminController_1 = require("../controllers/adminController");
 const qrController_1 = require("../controllers/qrController");
+const marketingRoutes_1 = require("./marketingRoutes");
 const router = (0, express_1.Router)();
 router.use(authMiddleware_1.verifyToken, authMiddleware_1.verifyAdmin);
+router.use("/marketing", marketingRoutes_1.default);
 router.get("/overview", adminController_1.getOverview);
 // Subscription plans
 router.get("/plans", adminController_1.getPlans);
