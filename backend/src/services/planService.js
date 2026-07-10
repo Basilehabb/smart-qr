@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateProfileForPlan = exports.getLimit = exports.hasFeature = exports.getPlanForUser = void 0;
+exports.validateProfileForPlan = exports.validateProfileAgainstPlan = exports.getLimit = exports.hasFeature = exports.getPlanForUser = void 0;
 
 const Plan = require("../models/Plan").default;
 
@@ -70,14 +70,19 @@ const countByBaseType = (entries) => {
   return count;
 };
 
-const validateProfileForPlan = async (user, profile) => {
-  const plan = await resolvePlan(user);
+const validateProfileAgainstPlan = (plan, profile, currentProfile = {}) => {
   if (!plan) return { feature: "canEditProfile" };
 
   const features = plan.features || {};
   const incomingEntries = profileEntries(profile);
-  const currentEntries = profileEntries(user?.profile);
-  const maxLinks = await getLimit(user, "maxLinks");
+  const currentEntries = profileEntries(currentProfile);
+  const maxLinks = typeof features.maxLinks === "number" && Number.isFinite(features.maxLinks) && features.maxLinks >= 0
+    ? features.maxLinks
+    : null;
+
+  if (features.canEditProfile === false && incomingEntries.length > currentEntries.length) {
+    return { feature: "canEditProfile" };
+  }
 
   // Existing links remain valid after a plan change; only an increase beyond the limit is blocked.
   if (maxLinks !== null && incomingEntries.length > maxLinks && incomingEntries.length > currentEntries.length) {
@@ -104,5 +109,11 @@ const validateProfileForPlan = async (user, profile) => {
   }
 
   return null;
+};
+exports.validateProfileAgainstPlan = validateProfileAgainstPlan;
+
+const validateProfileForPlan = async (user, profile) => {
+  const plan = await resolvePlan(user);
+  return validateProfileAgainstPlan(plan, profile, user?.profile || {});
 };
 exports.validateProfileForPlan = validateProfileForPlan;

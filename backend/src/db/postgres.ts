@@ -1,4 +1,4 @@
-import { Pool, QueryConfig, QueryResult, QueryResultRow } from "pg";
+import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from "pg";
 
 let activePool: Pool | null = null;
 
@@ -24,6 +24,7 @@ export const pool = {
     queryTextOrConfig: string | QueryConfig<any[]>,
     values?: any[]
   ): Promise<QueryResult<T>> => getPool().query<T>(queryTextOrConfig as any, values),
+  connect: (): Promise<PoolClient> => getPool().connect(),
   end: () => (activePool ? activePool.end() : Promise.resolve()),
 };
 

@@ -9,6 +9,8 @@ const uploadController_1 = require("../controllers/uploadController");
 const router = (0, express_1.Router)();
 // Register user
 router.post("/register", authController_1.register);
+router.get("/default-plan", authController_1.getDefaultPlan);
+router.post("/register-and-link-qr", authController_1.registerAndLinkQr);
 // Login user
 router.post("/login", authController_1.login);
 // Create admin (only used once during setup)

@@ -3,12 +3,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProfile = exports.getMe = exports.createAdminIfNotExists = exports.login = exports.register = void 0;
+exports.updateProfile = exports.getMe = exports.createAdminIfNotExists = exports.login = exports.registerAndLinkQr = exports.getDefaultPlan = exports.register = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
 const userService_1 = require("../services/userService");
 const planService_1 = require("../services/planService");
+const Plan = require("../models/Plan").default;
+const postgres_1 = require("../db/postgres");
+const crypto = require("crypto");
 const INTERNAL_EMAIL_DOMAIN = "phone.smartqr.local";
 /*----------------------------------------
   TOKEN GENERATOR
@@ -71,6 +74,24 @@ function formatProfileFromDoc(userDoc) {
     });
     return formatted;
 }
+function normalizeProfileForStorage(profile) {
+    const normalized = {};
+    const sections = ["contact", "social", "payment", "video", "music", "design", "gaming", "other"];
+    for (const section of sections) {
+        const values = profile?.[section];
+        const entries = [];
+        if (values && typeof values === "object") {
+            for (const [key, value] of Object.entries(values)) {
+                if (value !== undefined && value !== null && String(value).trim() !== "") {
+                    entries.push({ key: String(key), value: String(value) });
+                }
+            }
+        }
+        normalized[section] = entries;
+    }
+    return normalized;
+}
+const publicPlan = (plan) => ({ key: plan.key, name: plan.name, features: plan.features || {} });
 /*----------------------------------------
   REGISTER
 ----------------------------------------*/
@@ -123,6 +144,167 @@ const register = async (req, res) => {
     }
 };
 exports.register = register;
+/*----------------------------------------
+  DEFAULT REGISTRATION PLAN
+----------------------------------------*/
+const getDefaultPlan = async (_req, res) => {
+    try {
+        const plan = await Plan.getDefault();
+        if (!plan) {
+            return res.status(503).json({ message: "No active default plan is available" });
+        }
+        return res.json({ plan: publicPlan(plan) });
+    }
+    catch (err) {
+        console.error("getDefaultPlan error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+exports.getDefaultPlan = getDefaultPlan;
+/*----------------------------------------
+  ATOMIC REGISTER + OPTIONAL QR LINK
+----------------------------------------*/
+const registerAndLinkQr = async (req, res) => {
+    let client;
+    try {
+        const { name, email, password, phone, job, countryCode, profile, code } = req.body || {};
+        const normalizedPhone = normalizePhone(phone);
+        const trimmedName = String(name || "").trim();
+        const trimmedEmail = String(email || "").trim();
+        const rawPassword = String(password || "");
+        const qrCode = String(code || "").trim();
+        const incomingProfile = profile && typeof profile === "object" ? profile : {};
+        if (!trimmedName || !rawPassword || !normalizedPhone) {
+            return res.status(400).json({ message: "Name, phone, and password are required" });
+        }
+        client = await postgres_1.pool.connect();
+        await client.query("BEGIN");
+        const planResult = await client.query(
+            "SELECT * FROM plans WHERE is_default = TRUE AND is_active = TRUE LIMIT 1 FOR UPDATE"
+        );
+        const planRow = planResult.rows[0];
+        if (!planRow) {
+            await client.query("ROLLBACK");
+            return res.status(503).json({ message: "No active default plan is available" });
+        }
+        const plan = {
+            id: planRow.id,
+            key: planRow.key,
+            name: planRow.name,
+            features: typeof planRow.features === "string" ? JSON.parse(planRow.features) : (planRow.features || {}),
+        };
+        const restriction = (0, planService_1.validateProfileAgainstPlan)(plan, incomingProfile, {});
+        if (restriction) {
+            await client.query("ROLLBACK");
+            return res.status(403).json({ code: "UPGRADE_REQUIRED", feature: restriction.feature });
+        }
+        const finalEmail = trimmedEmail || buildInternalEmail(normalizedPhone);
+        const [phoneOwner, emailOwner] = await Promise.all([
+            client.query("SELECT id FROM users WHERE phone = $1 LIMIT 1", [normalizedPhone]),
+            client.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [finalEmail]),
+        ]);
+        if (phoneOwner.rows[0]) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ message: "Phone already exists" });
+        }
+        if (emailOwner.rows[0]) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ message: "Email already exists" });
+        }
+        let qrId = null;
+        if (qrCode) {
+            const qrResult = await client.query(
+                "SELECT id, user_id FROM qr_codes WHERE code = $1 LIMIT 1 FOR UPDATE",
+                [qrCode]
+            );
+            const qr = qrResult.rows[0];
+            if (!qr) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ message: "QR not found" });
+            }
+            if (qr.user_id) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ status: "already_linked", message: "QR already linked" });
+            }
+            qrId = qr.id;
+        }
+        const userId = crypto.randomUUID();
+        const passwordHash = await bcryptjs_1.default.hash(rawPassword, 10);
+        const storedProfile = normalizeProfileForStorage(incomingProfile);
+        await client.query(
+            `INSERT INTO users (
+              id, name, email, phone, country_code, job, password_hash, avatar,
+              avatar_public_id, is_admin, profile, plan_id, created_at, updated_at
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())`,
+            [
+                userId,
+                trimmedName,
+                finalEmail,
+                normalizedPhone,
+                countryCode || "+20",
+                job || "",
+                passwordHash,
+                "",
+                "",
+                false,
+                JSON.stringify(storedProfile),
+                plan.id,
+            ]
+        );
+        if (qrId) {
+            const linked = await client.query(
+                "UPDATE qr_codes SET user_id = $2, updated_at = NOW() WHERE id = $1 AND user_id IS NULL RETURNING id",
+                [qrId, userId]
+            );
+            if (!linked.rows[0]) {
+                throw new Error("QR_LINK_FAILED");
+            }
+        }
+        await client.query("COMMIT");
+        const user = {
+            _id: userId,
+            name: trimmedName,
+            email: finalEmail,
+            phone: normalizedPhone,
+            countryCode: countryCode || "+20",
+            job: job || "",
+            avatar: "",
+            isAdmin: false,
+            profile: storedProfile,
+        };
+        const token = generateToken(user);
+        return res.status(201).json({
+            message: qrCode ? "Account created and QR linked" : "Account created",
+            token,
+            user: {
+                id: userId,
+                name: user.name,
+                email: publicEmail(user.email),
+                phone: user.phone,
+                job: user.job,
+                avatar: user.avatar,
+                isAdmin: false,
+                profile: formatProfileFromDoc(user),
+                plan: publicPlan(plan),
+            },
+            ...(qrCode ? { code: qrCode } : {}),
+        });
+    }
+    catch (err) {
+        if (client) {
+            await client.query("ROLLBACK").catch(() => undefined);
+        }
+        console.error("registerAndLinkQr error:", err);
+        if (err?.code === "23505") {
+            return res.status(409).json({ message: "Phone or email already exists" });
+        }
+        return res.status(500).json({ message: "Could not create account" });
+    }
+    finally {
+        client?.release();
+    }
+};
+exports.registerAndLinkQr = registerAndLinkQr;
 /*----------------------------------------
   LOGIN
 ----------------------------------------*/
