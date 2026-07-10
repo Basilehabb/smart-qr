@@ -152,6 +152,9 @@ const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
 const buildInternalEmail = (phone) => `${normalizePhone(phone)}@${INTERNAL_EMAIL_DOMAIN}`;
 const isInternalEmail = (email) => String(email || "").endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
 const publicEmail = (email) => isInternalEmail(email) ? "" : String(email || "");
+const normalizePurchasedProducts = (products) => Array.isArray(products)
+    ? products.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
 const serializePlan = (plan) => ({
     id: plan.id,
     key: plan.key,
@@ -165,6 +168,7 @@ const serializeAdminUser = async (userDoc) => {
     userObj.profile = formatProfile(userDoc);
     userObj.email = publicEmail(userObj.email);
     userObj.loginPhone = userObj.phone || "";
+    userObj.purchasedProducts = normalizePurchasedProducts(userObj.purchasedProducts || userObj.purchased_products);
     const plan = userObj.planId ? await Plan_1.default.findById(userObj.planId) : null;
     userObj.plan = plan ? serializePlan(plan) : null;
     delete userObj.passwordHash;
@@ -530,7 +534,7 @@ exports.assignUserPlan = assignUserPlan;
 const listUsers = async (req, res) => {
     try {
         // Parse query params
-        const { search, isAdmin, hasQR, job, phoneExists, createdFrom, createdTo, sort, plan: planFilter, } = req.query;
+        const { search, isAdmin, hasQR, job, phoneExists, createdFrom, createdTo, sort, plan: planFilter, product, } = req.query;
         const page = Math.max(1, parseInt(req.query.page || "1")) || 1;
         const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || "20"))) || 20;
         // Build Mongo filter
@@ -561,6 +565,9 @@ const listUsers = async (req, res) => {
                 return res.json({ users: [], meta: { total: 0, page, limit, pages: 1 } });
             }
             filter.planId = plan.id;
+        }
+        if (product && String(product).trim()) {
+            filter.purchasedProducts = { $regex: String(product).trim(), $options: "i" };
         }
         // createdAt range
         if (createdFrom || createdTo) {
@@ -647,7 +654,7 @@ exports.listUsers = listUsers;
 ====================================================== */
 const createUser = async (req, res) => {
     try {
-        const { name, email, phone, job, password } = req.body;
+        const { name, email, phone, job, password, purchasedProducts } = req.body;
         if (!name || !phone || !password)
             return res.status(400).json({ message: "Missing fields" });
         if (await User_1.default.findOne({ phone: normalizePhone(phone) }))
@@ -660,6 +667,7 @@ const createUser = async (req, res) => {
             password,
             phone,
             job,
+            purchasedProducts: normalizePurchasedProducts(purchasedProducts),
             isAdmin: true
         });
         const userObj = await serializeAdminUser(user);
@@ -705,7 +713,7 @@ const updateUser = async (req, res) => {
         if (!user)
             return res.status(404).json({ message: "User not found" });
         // Basic fields only
-        const editable = ["name", "email", "phone", "job", "avatar", "isAdmin"];
+        const editable = ["name", "email", "phone", "job", "avatar", "isAdmin", "purchasedProducts"];
         editable.forEach((field) => {
             if (data[field] !== undefined) {
                 if (field === "phone") {
@@ -717,7 +725,7 @@ const updateUser = async (req, res) => {
                     user.email = String(data.email || "").trim() || buildInternalEmail(nextPhone || user.phone);
                     return;
                 }
-                user[field] = data[field];
+                user[field] = field === "purchasedProducts" ? normalizePurchasedProducts(data[field]) : data[field];
             }
         });
         if (data.password) {
@@ -745,7 +753,7 @@ const updateUserProfileAdmin = async (req, res) => {
         if (!user)
             return res.status(404).json({ message: "User not found" });
         // Update basic fields
-        const editable = ["name", "email", "phone", "job", "avatar", "countryCode", "isAdmin"];
+        const editable = ["name", "email", "phone", "job", "avatar", "countryCode", "isAdmin", "purchasedProducts"];
         editable.forEach(k => {
             if (data[k] !== undefined) {
                 if (k === "phone") {
@@ -757,7 +765,7 @@ const updateUserProfileAdmin = async (req, res) => {
                     user.email = String(data.email || "").trim() || buildInternalEmail(nextPhone || user.phone);
                     return;
                 }
-                user[k] = data[k];
+                user[k] = k === "purchasedProducts" ? normalizePurchasedProducts(data[k]) : data[k];
             }
         });
         if (data.password) {

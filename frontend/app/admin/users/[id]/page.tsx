@@ -65,7 +65,9 @@ export default function UserDetailsPage() {
     phone: "",
     job: "",
     avatar: "",
+    purchasedProducts: [] as string[],
   });
+  const [newProduct, setNewProduct] = useState("");
 
   // Profile editing
   const [profile, setProfile] = useState<ProfileSections>(EMPTY_PROFILE);
@@ -125,6 +127,7 @@ export default function UserDetailsPage() {
           phone: foundUser.phone || "",
           job: foundUser.job || "",
           avatar: foundUser.avatar || "",
+          purchasedProducts: Array.isArray(foundUser.purchasedProducts) ? foundUser.purchasedProducts : [],
         });
 
         // Load profile with better normalization
@@ -552,6 +555,20 @@ export default function UserDetailsPage() {
                 {user.email && <p><b>Public Email:</b> {user.email}</p>}
                 {user.phone && <p><b>Login Phone:</b> {user.phone}</p>}
                 {user.job && <p><b>Job:</b> {user.job}</p>}
+                <div className="mt-2">
+                  <b>Purchased Products:</b>{" "}
+                  {Array.isArray(user.purchasedProducts) && user.purchasedProducts.length > 0 ? (
+                    <span className="inline-flex flex-wrap gap-2 align-middle">
+                      {user.purchasedProducts.map((item: string) => (
+                        <span key={item} className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700 border border-amber-100">
+                          {item}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span>-</span>
+                  )}
+                </div>
 
                 <button className="mt-3 px-4 py-2 bg-purple-600 text-white rounded" onClick={resetPassword}>
                   Reset Password
@@ -596,6 +613,56 @@ export default function UserDetailsPage() {
                     value={editData.job}
                     onChange={(e) => setEditData({ ...editData, job: e.target.value })}
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-1">Purchased Products</label>
+                  <div className="flex gap-2">
+                    <input
+                      className="border px-3 py-2 rounded w-full"
+                      value={newProduct}
+                      onChange={(e) => setNewProduct(e.target.value)}
+                      placeholder="Product name"
+                    />
+                    <button
+                      type="button"
+                      className="px-4 py-2 bg-amber-600 text-white rounded"
+                      onClick={() => {
+                        const product = newProduct.trim();
+                        if (!product) return;
+                        setEditData((prev) => ({
+                          ...prev,
+                          purchasedProducts: Array.from(new Set([...(prev.purchasedProducts || []), product])),
+                        }));
+                        setNewProduct("");
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {editData.purchasedProducts.length === 0 && (
+                      <span className="text-sm text-gray-500">No products added.</span>
+                    )}
+                    {editData.purchasedProducts.map((item) => (
+                      <span key={item} className="inline-flex items-center gap-2 rounded bg-amber-50 px-3 py-1 text-sm text-amber-800 border border-amber-100">
+                        {item}
+                        <button
+                          type="button"
+                          className="text-amber-900 hover:text-red-600"
+                          onClick={() =>
+                            setEditData((prev) => ({
+                              ...prev,
+                              purchasedProducts: prev.purchasedProducts.filter((product) => product !== item),
+                            }))
+                          }
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="col-span-2 space-y-3">

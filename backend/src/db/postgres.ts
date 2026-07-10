@@ -86,6 +86,7 @@ export const initPostgres = async () => {
     );
 
     ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_id TEXT REFERENCES plans(id);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS purchased_products JSONB NOT NULL DEFAULT '[]'::jsonb;
   `);
 
   await pool.query(

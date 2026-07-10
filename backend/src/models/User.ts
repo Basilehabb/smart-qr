@@ -21,6 +21,7 @@ export interface UserDocument {
   avatarPublicId?: string;
   isAdmin: boolean;
   planId: string;
+  purchasedProducts: string[];
   profile?: Record<string, ProfileItem[]>;
   createdAt: Date;
   updatedAt: Date;
@@ -51,6 +52,11 @@ const normalizeProfile = (profile: any = {}) => {
   return out;
 };
 
+const normalizePurchasedProducts = (products: any = []) =>
+  (Array.isArray(products) ? products : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
 const rowToUser = (row: any): UserDocument | null => {
   if (!row) return null;
 
@@ -67,6 +73,7 @@ const rowToUser = (row: any): UserDocument | null => {
     avatarPublicId: row.avatar_public_id ?? "",
     isAdmin: Boolean(row.is_admin),
     planId: row.plan_id,
+    purchasedProducts: normalizePurchasedProducts(row.purchased_products),
     profile: normalizeProfile(row.profile),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -89,6 +96,7 @@ const rowToUser = (row: any): UserDocument | null => {
       avatarPublicId: user.avatarPublicId ?? "",
       isAdmin: user.isAdmin,
       planId: user.planId,
+      purchasedProducts: normalizePurchasedProducts(user.purchasedProducts),
       profile: normalizeProfile(user.profile),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -172,9 +180,9 @@ class User {
     const result = await pool.query(
       `INSERT INTO users (
         id, name, email, phone, country_code, job, password_hash, avatar,
-        avatar_public_id, is_admin, profile, plan_id, created_at, updated_at
+        avatar_public_id, is_admin, profile, plan_id, purchased_products, created_at, updated_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
       RETURNING *`,
       [
         id,
@@ -189,6 +197,7 @@ class User {
         data.isAdmin ?? data.is_admin ?? false,
         JSON.stringify(profile),
         planId,
+        JSON.stringify(normalizePurchasedProducts(data.purchasedProducts ?? data.purchased_products)),
       ]
     );
 
@@ -200,7 +209,7 @@ class User {
       `UPDATE users
        SET name = $2, email = $3, phone = $4, country_code = $5, job = $6,
            password_hash = $7, avatar = $8, avatar_public_id = $9,
-           is_admin = $10, profile = $11, plan_id = $12, updated_at = NOW()
+           is_admin = $10, profile = $11, plan_id = $12, purchased_products = $13, updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
       [
@@ -216,6 +225,7 @@ class User {
         user.isAdmin,
         JSON.stringify(normalizeProfile(user.profile)),
         user.planId,
+        JSON.stringify(normalizePurchasedProducts(user.purchasedProducts)),
       ]
     );
 
@@ -227,6 +237,9 @@ class User {
     if (!user) return null;
     Object.assign(user, update);
     if (update.profile) user.profile = normalizeProfile(update.profile);
+    if (update.purchasedProducts || update.purchased_products) {
+      user.purchasedProducts = normalizePurchasedProducts(update.purchasedProducts ?? update.purchased_products);
+    }
     return user.save();
   }
 

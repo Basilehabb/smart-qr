@@ -24,6 +24,7 @@ export default function AdminUsersPage() {
   const [isAdmin, setIsAdmin] = useState<string>(""); // "" | "true" | "false"
   const [hasQR, setHasQR] = useState<string>("");
   const [job, setJob] = useState("");
+  const [product, setProduct] = useState("");
   const [phoneExists, setPhoneExists] = useState<string>("");
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
@@ -40,6 +41,7 @@ export default function AdminUsersPage() {
     if (q.isAdmin) setIsAdmin(String(q.isAdmin));
     if (q.hasQR) setHasQR(String(q.hasQR));
     if (q.job) setJob(String(q.job));
+    if (q.product) setProduct(String(q.product));
     if (q.phoneExists) setPhoneExists(String(q.phoneExists));
     if (q.createdFrom) setCreatedFrom(String(q.createdFrom));
     if (q.createdTo) setCreatedTo(String(q.createdTo));
@@ -57,13 +59,14 @@ export default function AdminUsersPage() {
     isAdmin: isAdmin || undefined,
     hasQR: hasQR || undefined,
     job: job || undefined,
+    product: product || undefined,
     phoneExists: phoneExists || undefined,
     createdFrom: createdFrom || undefined,
     createdTo: createdTo || undefined,
     sort: sort || undefined,
     page: page || 1,
     limit: limit || 20,
-  }), [search, isAdmin, hasQR, job, phoneExists, createdFrom, createdTo, sort, page, limit]);
+  }), [search, isAdmin, hasQR, job, product, phoneExists, createdFrom, createdTo, sort, page, limit]);
 
   // Fetch users with current query and update URL
   async function fetchUsers(overrides?: any) {
@@ -117,13 +120,26 @@ export default function AdminUsersPage() {
     setIsAdmin("");
     setHasQR("");
     setJob("");
+    setProduct("");
     setPhoneExists("");
     setCreatedFrom("");
     setCreatedTo("");
     setSort("newest");
     setPage(1);
     setLimit(20);
-    fetchUsers({});
+    fetchUsers({
+      search: undefined,
+      isAdmin: undefined,
+      hasQR: undefined,
+      job: undefined,
+      product: undefined,
+      phoneExists: undefined,
+      createdFrom: undefined,
+      createdTo: undefined,
+      sort: "newest",
+      page: 1,
+      limit: 20,
+    });
   }
 
   // delete user
@@ -200,6 +216,7 @@ export default function AdminUsersPage() {
                   <tr className="border-b text-sm text-gray-600">
                     <th className="p-3">Name</th>
                     <th>Phone</th>
+                    <th>Products</th>
                     <th>QRs</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
@@ -213,6 +230,19 @@ export default function AdminUsersPage() {
                     >
                       <td className="p-3">{user.name}</td>
                       <td>{user.phone || user.email || "-"}</td>
+                      <td>
+                        {Array.isArray(user.purchasedProducts) && user.purchasedProducts.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {user.purchasedProducts.map((item: string) => (
+                              <span key={item} className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700 border border-amber-100">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
 
                       <td>{user.qrCount ?? 0}</td>
 
@@ -274,6 +304,16 @@ export default function AdminUsersPage() {
             <div>
               <label className="block text-sm mb-1">Job (contains)</label>
               <input value={job} onChange={(e) => setJob(e.target.value)} className="w-full border rounded px-2 py-1" />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Purchased product</label>
+              <input
+                value={product}
+                onChange={(e) => setProduct(e.target.value)}
+                className="w-full border rounded px-2 py-1"
+                placeholder="Search by product name"
+              />
             </div>
 
             <div>
